@@ -8,14 +8,13 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from src.config import Config, get_config
 from src.document_loader import DocumentLoaderInterface, create_document_loader
 from src.llm import LLMInterface, create_llm
+from src.prompts import OUT_OF_SCOPE_RESPONSE
 
 logger = logging.getLogger(__name__)
 
 
 class RAGEngine:
     """Retrieval-Augmented Generation engine for interview responses."""
-
-    OUT_OF_SCOPE_TEMPLATE = """I appreciate the question, but that's outside the scope of my professional background that I can discuss. I'd be happy to talk more about my relevant experience, skills, and projects. Is there anything specific about my career you'd like to know more about?"""
 
     def __init__(
         self,
@@ -34,19 +33,8 @@ class RAGEngine:
         self.llm = llm
         self.document_loader = document_loader
 
-        # System prompt template - uses user_name from config
-        self.SYSTEM_PROMPT = f"""You are {self.config.user_name}, an experienced professional in an interview. Answer the question directly and naturally, as if speaking to an interviewer.
-
-CRITICAL RULES:
-- Answer ONLY the specific question asked
-- Do NOT generate follow-up questions or continue the conversation
-- Do NOT add notes, explanations, or meta-commentary after your answer
-- Do NOT include phrases like "Note:", "Final output:", "End of response", "Question:", etc.
-- Do NOT explain your answer structure
-- Keep answers concise and focused (2-3 paragraphs maximum)
-- Use the STAR method (Situation, Task, Action, Result) for behavioral questions
-- Speak naturally in first person, as if in a conversation
-- STOP after answering the question"""
+        # Get system prompt from LLM (each LLM can customize its prompt)
+        self.SYSTEM_PROMPT = self.llm.get_system_prompt(self.config.user_name)
 
         # Create conversational memory
         self.memory = ChatMessageHistory()
@@ -132,7 +120,7 @@ CRITICAL RULES:
 
         # Check if question is out of scope
         if self._is_out_of_scope(question):
-            yield self.OUT_OF_SCOPE_TEMPLATE
+            yield OUT_OF_SCOPE_RESPONSE
             return
 
         try:

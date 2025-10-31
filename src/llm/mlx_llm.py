@@ -9,6 +9,7 @@ from mlx_lm.utils import load as mlx_load
 
 from src.config import get_config
 from src.llm.base import LLMInterface
+from src.prompts import format_rag_prompt, get_system_prompt, get_system_prompt_for_qwen
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,27 @@ class MLXLocalLLM(LLMInterface):
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
+
+    def get_system_prompt(self, user_name: str) -> str:
+        """Get the system prompt for MLX local models.
+
+        Automatically detects Qwen models and uses optimized prompt.
+
+        Args:
+            user_name: Name of the user/candidate
+
+        Returns:
+            System prompt string optimized for the specific model
+        """
+        model_name = self.config.local_model_name.lower()
+
+        # Use Qwen-specific prompt for Qwen models
+        if "qwen" in model_name:
+            logger.info("Using Qwen-optimized system prompt")
+            return get_system_prompt_for_qwen(user_name)
+
+        # Default prompt for other models
+        return get_system_prompt(user_name)
 
     def generate(
         self, prompt: str, system_prompt: str | None = None, stream: bool = False
@@ -158,16 +180,13 @@ class MLXLocalLLM(LLMInterface):
                         content = msg.content if hasattr(msg, "content") else str(msg)
                         history_str += f"{role}: {content}\n"
 
-                # Build full prompt
-                full_prompt = f"""{self.system_prompt}
-
-Context from your career:
-{context}
-
-{history_str}
-Human: {question}
-AI:"""
-                return full_prompt
+                # Use the format_rag_prompt function from prompts module
+                return format_rag_prompt(
+                    system_prompt=self.system_prompt,
+                    context=context,
+                    chat_history=history_str,
+                    question=question,
+                )
 
             def invoke(self, inputs: dict, config: dict | None = None) -> Any:  # noqa: ARG002
                 """Non-streaming invocation."""

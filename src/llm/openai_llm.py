@@ -9,6 +9,7 @@ from langchain_openai import ChatOpenAI
 
 from src.config import get_config
 from src.llm.base import LLMInterface
+from src.prompts import get_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,17 @@ class OpenAILLM(LLMInterface):
             logger.info(f"Initialized OpenAI client with model: {self.config.openai_model_name}")
         except ImportError:
             raise ImportError("OpenAI package not installed. Install with: pip install openai")
+
+    def get_system_prompt(self, user_name: str) -> str:
+        """Get the system prompt for OpenAI models.
+
+        Args:
+            user_name: Name of the user/candidate
+
+        Returns:
+            System prompt string optimized for OpenAI models
+        """
+        return get_system_prompt(user_name)
 
     def generate(
         self, prompt: str, system_prompt: str | None = None, stream: bool = False

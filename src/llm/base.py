@@ -9,6 +9,21 @@ class LLMInterface(ABC):
     """Abstract base class for LLM implementations."""
 
     @abstractmethod
+    def get_system_prompt(self, user_name: str) -> str:
+        """Get the system prompt for this LLM.
+
+        Each LLM implementation can customize the system prompt based on
+        its specific capabilities and requirements.
+
+        Args:
+            user_name: Name of the user/candidate
+
+        Returns:
+            System prompt string
+        """
+        pass
+
+    @abstractmethod
     def generate(
         self, prompt: str, system_prompt: str | None = None, stream: bool = False
     ) -> Generator[str]:
