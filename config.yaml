@@ -1,0 +1,35 @@
+# Model Configuration
+model:
+  # Local model settings
+  local:
+    model_name: "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit"
+    device: "mps"
+    max_new_tokens: 512
+    temperature: 0.7
+
+  # API settings
+  openai:
+    model_name: "gpt-4o-mini"
+    max_tokens: 1024
+    temperature: 0.7
+
+# RAG Configuration
+rag:
+  chunk_size: 800
+  chunk_overlap: 200
+  top_k: 5
+  relevance_threshold: 0.5
+  embedding_model: "BAAI/bge-base-en-v1.5"
+
+# Data Configuration
+data:
+  career_data_path: "./career_data"
+  vector_db_path: "./vector_db"
+  rebuild_index: false
+
+# UI Configuration
+ui:
+  title: "AI Interviewee"
+  description: "Ask me questions about my professional background and experience."
+  show_examples: true
+  enable_history: true
