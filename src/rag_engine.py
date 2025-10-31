@@ -1,10 +1,13 @@
 """RAG (Retrieval-Augmented Generation) engine for AI Interviewee."""
 
 import logging
+from collections.abc import Iterator
 
-from src.config import get_config
-from src.document_loader import DocumentLoader
-from src.llm import create_llm
+from langchain_community.chat_message_histories import ChatMessageHistory
+
+from src.config import Config, get_config
+from src.document_loader import DocumentLoaderInterface, create_document_loader
+from src.llm import LLMInterface, create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +17,25 @@ class RAGEngine:
 
     OUT_OF_SCOPE_TEMPLATE = """I appreciate the question, but that's outside the scope of my professional background that I can discuss. I'd be happy to talk more about my relevant experience, skills, and projects. Is there anything specific about my career you'd like to know more about?"""
 
-    def __init__(self, config=None):
-        """Initialize RAG engine.
+    def __init__(
+        self,
+        llm: LLMInterface,
+        document_loader: DocumentLoaderInterface,
+        config: Config | None = None,
+    ):
+        """Initialize RAG engine with injected dependencies.
 
         Args:
+            llm: LLM interface instance
+            document_loader: Document loader interface instance
             config: Configuration instance (creates new if None)
         """
         self.config = config or get_config()
-        self.conversation_history: list = []
+        self.llm = llm
+        self.document_loader = document_loader
 
         # System prompt template - uses user_name from config
-        self.SYSTEM_PROMPT_TEMPLATE = f"""You are {self.config.user_name}, an experienced professional in an interview. Answer the question directly and naturally, as if speaking to an interviewer.
+        self.SYSTEM_PROMPT = f"""You are {self.config.user_name}, an experienced professional in an interview. Answer the question directly and naturally, as if speaking to an interviewer.
 
 CRITICAL RULES:
 - Answer ONLY the specific question asked
@@ -35,46 +46,42 @@ CRITICAL RULES:
 - Keep answers concise and focused (2-3 paragraphs maximum)
 - Use the STAR method (Situation, Task, Action, Result) for behavioral questions
 - Speak naturally in first person, as if in a conversation
-- STOP after answering the question
+- STOP after answering the question"""
 
-Context from your career:
-{{context}}
+        # Create conversational memory
+        self.memory = ChatMessageHistory()
 
-Question: {{question}}
+        # Create retriever from document loader
+        self.retriever = self.document_loader.get_retriever()
 
-Answer:"""
+        # Create RAG chain from LLM
+        self.chain = self.llm.create_rag_chain(
+            retriever=self.retriever,
+            memory=self.memory,
+            system_prompt=self.SYSTEM_PROMPT,
+        )
 
-        # Initialize document loader and vector store
-        logger.info("Initializing RAG engine")
-        self.document_loader = DocumentLoader(self.config)
-        self.document_loader.initialize()
+        logger.info(f"RAG engine initialized with {self.llm} and {self.document_loader}")
 
-        # Initialize LLM
-        self.llm = create_llm(self.config)
-
-        logger.info(f"RAG engine initialized with {self.llm}")
-
-    def _format_context(self, retrieved_docs: list) -> str:
-        """Format retrieved documents into context string.
+    @classmethod
+    def create_default(cls, config: Config | None = None) -> "RAGEngine":
+        """Factory method to create RAG engine with default dependencies.
 
         Args:
-            retrieved_docs: List of (document, score) tuples
+            config: Configuration instance (creates new if None)
 
         Returns:
-            Formatted context string
+            RAGEngine instance with default dependencies
         """
-        if not retrieved_docs:
-            return "No specific career information retrieved."
+        config = config or get_config()
+        logger.info("Creating RAG engine with default dependencies")
 
-        context_parts = []
-        for i, (doc, _) in enumerate(retrieved_docs, 1):
-            # Extract source file name
-            source = doc.metadata.get("source", "Unknown")
-            source_name = source.split("/")[-1] if "/" in source else source
+        # Create dependencies
+        llm = create_llm(config)
+        document_loader = create_document_loader(config)
+        document_loader.initialize()
 
-            context_parts.append(f"[Source {i}: {source_name}]\n{doc.page_content}\n")
-
-        return "\n".join(context_parts)
+        return cls(llm=llm, document_loader=document_loader, config=config)
 
     def _is_out_of_scope(self, question: str) -> bool:
         """Check if question is out of scope (basic heuristic).
@@ -108,31 +115,9 @@ Answer:"""
 
         return False
 
-    def retrieve_context(self, question: str) -> tuple[str, list]:
-        """Retrieve relevant context for a question.
-
-        Args:
-            question: User question
-
-        Returns:
-            Tuple of (formatted_context, list of (doc, score) tuples)
-        """
-        logger.info(f"Retrieving context for question: {question[:100]}...")
-
-        # Search for relevant documents
-        retrieved_docs = self.document_loader.search(question, k=self.config.top_k)
-
-        if not retrieved_docs:
-            logger.warning("No relevant documents found for question")
-
-        logger.info(f"Retrieved {len(retrieved_docs)} relevant document chunks")
-
-        # Format context
-        context = self._format_context(retrieved_docs)
-
-        return context, retrieved_docs
-
-    def generate_response(self, question: str, use_history: bool = True, stream: bool = False):
+    def generate_response(
+        self, question: str, use_history: bool = True, stream: bool = False
+    ) -> Iterator[str]:
         """Generate response to interview question.
 
         Args:
@@ -140,80 +125,69 @@ Answer:"""
             use_history: Whether to consider conversation history
             stream: Whether to stream the response
 
-        Returns:
-            Dictionary containing response info, or generator if streaming
+        Yields:
+            Response tokens
         """
         logger.info(f"Generating response for: {question[:100]}...")
 
-        result = {
-            "response": "",
-            "context": "",
-            "sources": [],
-            "out_of_scope": False,
-        }
-
         # Check if question is out of scope
         if self._is_out_of_scope(question):
-            result["response"] = self.OUT_OF_SCOPE_TEMPLATE
-            result["out_of_scope"] = True
-            if stream:
-                yield result["response"]
-                return
-            return result
+            yield self.OUT_OF_SCOPE_TEMPLATE
+            return
 
-        # Retrieve context
-        context, retrieved_docs = self.retrieve_context(question)
-        result["context"] = context
-        result["sources"] = [doc.metadata.get("source", "Unknown") for doc, _ in retrieved_docs]
-
-        # Build prompt with context
-        prompt = self.SYSTEM_PROMPT_TEMPLATE.format(context=context, question=question)
-
-        # Generate response
         try:
+            # Get chat history if needed
+            chat_history = self.memory.messages if use_history else []
+
+            # Prepare inputs
+            inputs = {"question": question, "chat_history": chat_history}
+
+            # Collect full response for history
+            full_response = ""
+
             if stream:
-                # Stream the response
-                full_response = ""
-                for token in self.llm.generate(prompt, stream=True):
+                # Streaming - manually manage history
+                for chunk in self.chain.stream(inputs):
+                    # chunk is a string token
+                    token = chunk if isinstance(chunk, str) else str(chunk)
                     full_response += token
                     yield token
-
-                # Update conversation history after streaming completes
-                if use_history and self.config.enable_history:
-                    self.conversation_history.append(
-                        {"question": question, "answer": full_response}
-                    )
                 logger.info("Streaming response generated successfully")
             else:
-                # Non-streaming response - consume the generator
-                response = "".join(self.llm.generate(prompt, stream=False))
-                result["response"] = response
-
-                # Update conversation history if enabled
-                if use_history and self.config.enable_history:
-                    self.conversation_history.append({"question": question, "answer": response})
-
+                # Non-streaming - manually manage history
+                result = self.chain.invoke(inputs)
+                response = result if isinstance(result, str) else str(result)
+                full_response = response
+                yield response
                 logger.info("Response generated successfully")
-                return result
+
+            # Manually add to history
+            from langchain_core.messages import AIMessage, HumanMessage
+
+            self.memory.add_message(HumanMessage(content=question))
+            self.memory.add_message(AIMessage(content=full_response))
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-
-        return result
+            error_msg = (
+                "I apologize, but I encountered an error. "
+                "Please try again or rephrase your question."
+            )
+            yield error_msg
 
     def clear_history(self) -> None:
         """Clear conversation history."""
-        self.conversation_history = []
+        self.memory.clear()
         logger.info("Conversation history cleared")
 
     def get_history(self) -> list:
         """Get conversation history.
 
         Returns:
-            List of conversation turns
+            List of conversation messages
         """
-        return self.conversation_history.copy()
+        return self.memory.messages
 
     def __repr__(self) -> str:
         """String representation of RAG engine."""
-        return f"RAGEngine(llm={self.llm}, docs_loaded={self.document_loader.vector_store is not None})"
+        return f"RAGEngine(llm={self.llm}, document_loader={self.document_loader})"

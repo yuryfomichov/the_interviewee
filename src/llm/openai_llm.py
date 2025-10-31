@@ -2,6 +2,10 @@
 
 import logging
 from collections.abc import Generator
+from typing import Any
+
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI
 
 from src.config import get_config
 from src.llm.base import LLMInterface
@@ -106,6 +110,116 @@ class OpenAILLM(LLMInterface):
         except Exception as e:
             logger.error(f"OpenAI API error: {e}")
             raise
+
+    def create_rag_chain(
+        self,
+        retriever: Any,
+        memory: Any,  # noqa: ARG002 - kept for API compatibility
+        system_prompt: str,
+    ) -> Any:
+        """Create a RAG chain with memory for OpenAI.
+
+        Args:
+            retriever: Vector store retriever
+            memory: Chat message history (not used - history managed externally)
+            system_prompt: System prompt template
+
+        Returns:
+            Callable that generates responses with streaming support
+        """
+        # Create LangChain ChatOpenAI instance
+        langchain_llm = ChatOpenAI(
+            model=self.config.openai_model_name,
+            temperature=self.config.openai_temperature,
+            max_completion_tokens=self.config.openai_max_tokens,
+            streaming=True,
+        )
+
+        # Format docs helper
+        def format_docs(docs):
+            if not docs:
+                return "No specific career information retrieved."
+            context_parts = []
+            for i, doc in enumerate(docs, 1):
+                # Handle both Document objects and strings
+                if isinstance(doc, str):
+                    context_parts.append(f"[Source {i}]\n{doc}\n")
+                else:
+                    source = (
+                        doc.metadata.get("source", "Unknown")
+                        if hasattr(doc, "metadata")
+                        else "Unknown"
+                    )
+                    source_name = source.split("/")[-1] if "/" in source else source
+                    page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
+                    context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
+            return "\n".join(context_parts)
+
+        # Create a simple chain object that supports both streaming and non-streaming
+        class OpenAIRAGChain:
+            """Simple RAG chain for OpenAI that properly supports streaming."""
+
+            def __init__(self, llm, retriever, system_prompt):
+                self.llm = llm
+                self.retriever = retriever
+                self.system_prompt = system_prompt
+
+                # Create prompt template
+                self.prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            f"""{system_prompt}
+
+Context from your career:
+{{context}}""",
+                        ),
+                        MessagesPlaceholder(variable_name="chat_history"),
+                        ("human", "{question}"),
+                    ]
+                )
+
+            def invoke(self, inputs: dict, config: dict | None = None) -> Any:  # noqa: ARG002
+                """Non-streaming invocation."""
+                question = inputs.get("question", "")
+                chat_history = inputs.get("chat_history", [])
+
+                # Get context from retriever
+                docs = self.retriever.invoke(question)
+                context = format_docs(docs)
+
+                # Format prompt
+                messages = self.prompt.format_messages(
+                    context=context,
+                    chat_history=chat_history,
+                    question=question,
+                )
+
+                # Generate response (non-streaming)
+                response = self.llm.invoke(messages)
+                return response.content
+
+            def stream(self, inputs: dict, config: dict | None = None):  # noqa: ARG002
+                """Streaming invocation."""
+                question = inputs.get("question", "")
+                chat_history = inputs.get("chat_history", [])
+
+                # Get context from retriever
+                docs = self.retriever.invoke(question)
+                context = format_docs(docs)
+
+                # Format prompt
+                messages = self.prompt.format_messages(
+                    context=context,
+                    chat_history=chat_history,
+                    question=question,
+                )
+
+                # Stream response
+                for chunk in self.llm.stream(messages):
+                    yield chunk.content
+
+        return OpenAIRAGChain(langchain_llm, retriever, system_prompt)
 
     def __repr__(self) -> str:
         """String representation of the LLM."""

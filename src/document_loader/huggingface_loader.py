@@ -1,33 +1,40 @@
-"""Document loading and vector database management for AI Interviewee."""
+"""HuggingFace-based document loader implementation."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import (
+    HuggingFaceEmbeddings,  # type: ignore[reportGeneralTypeIssues]
+)
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.config import get_config
+from src.config import Config
+from src.document_loader.base import DocumentLoaderInterface
+
+if TYPE_CHECKING:
+    from langchain_core.vectorstores import VectorStoreRetriever
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentLoader:
-    """Manages loading career documents and creating vector database."""
+class HuggingFaceDocumentLoader(DocumentLoaderInterface):
+    """Document loader using HuggingFace embeddings and Chroma vector store."""
 
-    def __init__(self, config=None):
-        """Initialize document loader.
+    def __init__(self, config: Config):
+        """Initialize HuggingFace document loader.
 
         Args:
-            config: Configuration instance (creates new if None)
+            config: Configuration instance
         """
-        self.config = config or get_config()
+        self.config = config
         self.embeddings = None
         self.vector_store = None
         self._initialize_embeddings()
 
     def _initialize_embeddings(self) -> None:
-        """Initialize embedding model."""
+        """Initialize HuggingFace embedding model."""
         logger.info(f"Loading embedding model: {self.config.embedding_model}")
 
         # Set up HuggingFace embeddings
@@ -150,7 +157,7 @@ class DocumentLoader:
         Returns:
             Chroma vector store instance
         """
-        logger.info("Initializing document loader pipeline")
+        logger.info("Initializing HuggingFace document loader pipeline")
 
         # If vector store exists and we're not rebuilding, just load it
         if (
@@ -165,7 +172,7 @@ class DocumentLoader:
         chunks = self.split_documents(documents)
         vector_store = self.create_vector_store(chunks, force_rebuild=force_rebuild)
 
-        logger.info("Document loader initialization complete")
+        logger.info("HuggingFace document loader initialization complete")
         return vector_store
 
     def search(self, query: str, k: int | None = None) -> list[tuple]:
@@ -196,3 +203,21 @@ class DocumentLoader:
         )
 
         return filtered_results
+
+    def get_retriever(self) -> "VectorStoreRetriever":
+        """Get vector store retriever for use with LangChain.
+
+        Returns:
+            LangChain VectorStoreRetriever instance
+        """
+        if self.vector_store is None:
+            raise RuntimeError("Vector store not initialized. Call initialize() first.")
+
+        return self.vector_store.as_retriever(search_kwargs={"k": self.config.top_k})
+
+    def __repr__(self) -> str:
+        """String representation of the document loader."""
+        return (
+            f"HuggingFaceDocumentLoader(model={self.config.embedding_model}, "
+            f"vector_store_initialized={self.vector_store is not None})"
+        )

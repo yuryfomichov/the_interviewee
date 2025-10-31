@@ -34,7 +34,7 @@ class InterviewApp:
         """Initialize the RAG engine."""
         logger.info("Initializing RAG engine...")
         try:
-            self.engine = RAGEngine(self.config)
+            self.engine = RAGEngine.create_default(self.config)
             logger.info("RAG engine initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize RAG engine: {e}")
@@ -51,6 +51,7 @@ class InterviewApp:
             Accumulated response for streaming display
         """
         if not message or not message.strip():
+            yield ""
             return
 
         if not self.engine:

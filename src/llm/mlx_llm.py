@@ -2,9 +2,10 @@
 
 import logging
 from collections.abc import Generator
+from typing import Any
 
-from mlx_lm.generate import generate, stream_generate
-from mlx_lm.utils import load
+from mlx_lm.generate import stream_generate
+from mlx_lm.utils import load as mlx_load
 
 from src.config import get_config
 from src.llm.base import LLMInterface
@@ -13,43 +14,41 @@ logger = logging.getLogger(__name__)
 
 
 class MLXLocalLLM(LLMInterface):
-    """Apple Silicon optimized LLM using MLX with quantization support."""
+    """Apple Silicon optimized LLM using MLX with LangChain integration."""
 
     def __init__(self, config=None):
-        """Initialize MLX LLM.
+        """Initialize MLX LLM using both LangChain MLXPipeline and direct mlx_lm.
 
         Args:
             config: Configuration instance (creates new if None)
         """
         self.config = config or get_config()
 
-        # Load model using MLX with automatic quantization
         model_name = self.config.local_model_name
-
         logger.info(f"Loading model with MLX: {model_name}")
         logger.info("Device: Apple Silicon (Metal)")
 
-        # Prepare authentication token for gated models (e.g., Llama)
+        # Prepare authentication token for gated models
         token = self.config.huggingface_token
         if token:
             logger.info("Using HuggingFace authentication token")
-
-        try:
-            # MLX load function does not accept quantization parameter
-            # Quantization is handled by loading pre-quantized models from HuggingFace
-            # or by converting models separately using mlx_lm.convert
             import os
 
-            if token:
-                os.environ["HF_TOKEN"] = token
+            os.environ["HF_TOKEN"] = token
 
-            # Load model and tokenizer (don't need config)
-            model, tokenizer = load(model_name, return_config=False)  # type: ignore[misc]
-            self.model = model
-            self.tokenizer = tokenizer
-            logger.info("Model loaded successfully with MLX")
+        try:
+            # Load model and tokenizer using mlx_lm directly (single load for both streaming and non-streaming)
+            logger.info("Loading model with mlx_lm...")
+            model_artifacts = mlx_load(model_name)
+            # mlx_load can return 2 or 3 items (model, tokenizer, [config])
+            self.model = model_artifacts[0]
+            self.tokenizer = model_artifacts[1]
+
+            # Don't load a second copy via MLXPipeline - use mlx_lm directly for everything
+            self.mlx_pipeline = None
+            logger.info("Model loaded successfully")
         except Exception as e:
-            logger.error(f"Failed to load model with MLX: {e}")
+            logger.error(f"Failed to load model: {e}")
             raise
 
     def generate(
@@ -71,54 +70,158 @@ class MLXLocalLLM(LLMInterface):
         else:
             full_prompt = prompt
 
-        # Generate with MLX
         try:
             if stream:
-                has_yielded = False
-                try:
-                    for response in stream_generate(
-                        self.model,
-                        self.tokenizer,
-                        prompt=full_prompt,
-                        max_tokens=self.config.local_model_max_tokens,
-                    ):
-                        # stream_generate returns a GenerationResponse object
-                        # with a 'text' attribute containing the generated text
-                        if hasattr(response, "text"):
-                            text = response.text
-                        else:
-                            # Fallback: response might be a tuple (text, _)
-                            text = response[0] if isinstance(response, tuple) else str(response)
-
-                        has_yielded = True
-                        yield text
-                except StopIteration:
-                    pass
-
-                # If nothing was yielded, ensure we yield at least something
-                if not has_yielded:
-                    logger.warning("Stream generated no tokens, falling back to non-streaming")
-                    response = generate(
-                        self.model,
-                        self.tokenizer,
-                        prompt=full_prompt,
-                        max_tokens=self.config.local_model_max_tokens,
-                        verbose=False,
-                    )
-                    yield response.strip()
+                # Stream using mlx_lm directly (MLXPipeline streaming is broken)
+                for generation_response in stream_generate(
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    prompt=full_prompt,
+                    max_tokens=self.config.local_model_max_tokens,
+                ):
+                    # stream_generate yields GenerationResponse objects with a text attribute
+                    yield generation_response.text
             else:
-                # Non-streaming: yield complete response as single chunk
-                response = generate(
-                    self.model,
-                    self.tokenizer,
+                # Non-streaming: use mlx_lm generate and collect full response
+                from mlx_lm.generate import generate as mlx_generate
+
+                response = mlx_generate(
+                    model=self.model,
+                    tokenizer=self.tokenizer,
                     prompt=full_prompt,
                     max_tokens=self.config.local_model_max_tokens,
                     verbose=False,
                 )
-                yield response.strip()
+                yield response.strip() if response else ""
         except Exception as e:
             logger.error(f"Generation error: {e}")
             raise
+
+    def create_rag_chain(
+        self,
+        retriever: Any,
+        memory: Any,  # noqa: ARG002 - kept for API compatibility
+        system_prompt: str,
+    ) -> Any:
+        """Create a RAG chain with memory for MLX.
+
+        Args:
+            retriever: Vector store retriever
+            memory: Chat message history (not used - history managed externally)
+            system_prompt: System prompt template
+
+        Returns:
+            Callable that generates responses with streaming support
+        """
+        # Use MLXPipeline directly (ChatMLX doesn't work well with ChatPromptTemplate)
+        # We format the prompt as a string instead of using chat messages
+
+        # Format docs helper
+        def format_docs(docs):
+            if not docs:
+                return "No specific career information retrieved."
+            context_parts = []
+            for i, doc in enumerate(docs, 1):
+                # Handle both Document objects and strings
+                if isinstance(doc, str):
+                    context_parts.append(f"[Source {i}]\n{doc}\n")
+                else:
+                    # Document object with metadata
+                    source = (
+                        doc.metadata.get("source", "Unknown")
+                        if hasattr(doc, "metadata")
+                        else "Unknown"
+                    )
+                    source_name = source.split("/")[-1] if "/" in source else source
+                    page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
+                    context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
+            return "\n".join(context_parts)
+
+        # Create a simple chain object that supports both streaming and non-streaming
+        class MLXRAGChain:
+            """Simple RAG chain for MLX that properly supports streaming."""
+
+            def __init__(self, retriever, system_prompt, model, tokenizer, max_tokens):
+                self.retriever = retriever
+                self.system_prompt = system_prompt
+                self.model = model
+                self.tokenizer = tokenizer
+                self.max_tokens = max_tokens
+
+            def _format_prompt(self, question: str, chat_history: list, context: str) -> str:
+                """Format the full prompt."""
+                # Format chat history
+                history_str = ""
+                if chat_history:
+                    for msg in chat_history:
+                        role = "Human" if hasattr(msg, "type") and msg.type == "human" else "AI"
+                        content = msg.content if hasattr(msg, "content") else str(msg)
+                        history_str += f"{role}: {content}\n"
+
+                # Build full prompt
+                full_prompt = f"""{self.system_prompt}
+
+Context from your career:
+{context}
+
+{history_str}
+Human: {question}
+AI:"""
+                return full_prompt
+
+            def invoke(self, inputs: dict, config: dict | None = None) -> Any:  # noqa: ARG002
+                """Non-streaming invocation."""
+                question = inputs.get("question", "")
+                chat_history = inputs.get("chat_history", [])
+
+                # Get context from retriever
+                docs = self.retriever.invoke(question)
+                context = format_docs(docs)
+
+                # Format prompt
+                full_prompt = self._format_prompt(question, chat_history, context)
+
+                # Generate response (non-streaming) using mlx_lm directly
+                from mlx_lm.generate import generate as mlx_generate
+
+                response = mlx_generate(
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    prompt=full_prompt,
+                    max_tokens=self.max_tokens,
+                    verbose=False,
+                )
+                return response
+
+            def stream(self, inputs: dict, config: dict | None = None):  # noqa: ARG002
+                """Streaming invocation."""
+                question = inputs.get("question", "")
+                chat_history = inputs.get("chat_history", [])
+
+                # Get context from retriever
+                docs = self.retriever.invoke(question)
+                context = format_docs(docs)
+
+                # Format prompt
+                full_prompt = self._format_prompt(question, chat_history, context)
+
+                # Stream response using mlx_lm directly (MLXPipeline streaming is broken)
+                for generation_response in stream_generate(
+                    model=self.model,
+                    tokenizer=self.tokenizer,
+                    prompt=full_prompt,
+                    max_tokens=self.max_tokens,
+                ):
+                    # stream_generate yields GenerationResponse objects with a text attribute
+                    yield generation_response.text
+
+        return MLXRAGChain(
+            retriever,
+            system_prompt,
+            self.model,
+            self.tokenizer,
+            self.config.local_model_max_tokens,
+        )
 
     def __repr__(self) -> str:
         """String representation of the LLM."""

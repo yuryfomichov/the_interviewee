@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Generator
+from typing import Any
 
 
 class LLMInterface(ABC):
@@ -20,6 +21,25 @@ class LLMInterface(ABC):
 
         Returns:
             Generator that yields text chunks. For non-streaming, yields complete response as single chunk.
+        """
+        pass
+
+    @abstractmethod
+    def create_rag_chain(
+        self,
+        retriever: Any,
+        memory: Any,
+        system_prompt: str,
+    ) -> Any:
+        """Create a RAG chain with memory for this LLM.
+
+        Args:
+            retriever: Vector store retriever
+            memory: Chat message history
+            system_prompt: System prompt template
+
+        Returns:
+            LangChain runnable chain
         """
         pass
 
