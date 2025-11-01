@@ -6,8 +6,7 @@ from collections.abc import Iterator
 from langchain_community.chat_message_histories import ChatMessageHistory
 
 from src.config import Config, get_config
-from src.document_loader import DocumentLoaderInterface, create_document_loader
-from src.llm import LLMInterface, create_llm
+from src.llm.base import LLMInterface
 from src.prompts import OUT_OF_SCOPE_RESPONSE
 
 logger = logging.getLogger(__name__)
@@ -19,57 +18,21 @@ class RAGEngine:
     def __init__(
         self,
         llm: LLMInterface,
-        document_loader: DocumentLoaderInterface,
         config: Config | None = None,
     ):
         """Initialize RAG engine with injected dependencies.
 
         Args:
-            llm: LLM interface instance
-            document_loader: Document loader interface instance
+            llm: LLM instance (must implement invoke and stream methods)
             config: Configuration instance (creates new if None)
         """
         self.config = config or get_config()
         self.llm = llm
-        self.document_loader = document_loader
-
-        # Get system prompt from LLM (each LLM can customize its prompt)
-        self.SYSTEM_PROMPT = self.llm.get_system_prompt(self.config.user_name)
 
         # Create conversational memory
         self.memory = ChatMessageHistory()
 
-        # Create retriever from document loader
-        self.retriever = self.document_loader.get_retriever()
-
-        # Create RAG chain from LLM
-        self.chain = self.llm.create_rag_chain(
-            retriever=self.retriever,
-            memory=self.memory,
-            system_prompt=self.SYSTEM_PROMPT,
-        )
-
-        logger.info(f"RAG engine initialized with {self.llm} and {self.document_loader}")
-
-    @classmethod
-    def create_default(cls, config: Config | None = None) -> "RAGEngine":
-        """Factory method to create RAG engine with default dependencies.
-
-        Args:
-            config: Configuration instance (creates new if None)
-
-        Returns:
-            RAGEngine instance with default dependencies
-        """
-        config = config or get_config()
-        logger.info("Creating RAG engine with default dependencies")
-
-        # Create dependencies
-        llm = create_llm(config)
-        document_loader = create_document_loader(config)
-        document_loader.initialize()
-
-        return cls(llm=llm, document_loader=document_loader, config=config)
+        logger.info(f"RAG engine initialized with LLM: {type(llm).__name__}")
 
     def _is_out_of_scope(self, question: str) -> bool:
         """Check if question is out of scope (basic heuristic).
@@ -135,7 +98,7 @@ class RAGEngine:
 
             if stream:
                 # Streaming - manually manage history
-                for chunk in self.chain.stream(inputs):
+                for chunk in self.llm.stream(inputs):
                     # chunk is a string token
                     token = chunk if isinstance(chunk, str) else str(chunk)
                     full_response += token
@@ -143,7 +106,7 @@ class RAGEngine:
                 logger.info("Streaming response generated successfully")
             else:
                 # Non-streaming - manually manage history
-                result = self.chain.invoke(inputs)
+                result = self.llm.invoke(inputs)
                 response = result if isinstance(result, str) else str(result)
                 full_response = response
                 yield response
@@ -168,14 +131,6 @@ class RAGEngine:
         self.memory.clear()
         logger.info("Conversation history cleared")
 
-    def get_history(self) -> list:
-        """Get conversation history.
-
-        Returns:
-            List of conversation messages
-        """
-        return self.memory.messages
-
     def __repr__(self) -> str:
         """String representation of RAG engine."""
-        return f"RAGEngine(llm={self.llm}, document_loader={self.document_loader})"
+        return f"RAGEngine(llm={type(self.llm).__name__})"

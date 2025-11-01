@@ -1,12 +1,14 @@
 """Base interface for LLM implementations."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
-from typing import Any
+from collections.abc import Iterator
 
 
 class LLMInterface(ABC):
-    """Abstract base class for LLM implementations."""
+    """Abstract base class for LLM implementations.
+
+    LLM implementations must support RAG-based invoke and stream methods.
+    """
 
     @abstractmethod
     def get_system_prompt(self, user_name: str) -> str:
@@ -24,37 +26,26 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    def generate(
-        self, prompt: str, system_prompt: str | None = None, stream: bool = False
-    ) -> Generator[str]:
-        """Generate response from the model.
+    def invoke(self, inputs: dict) -> str:
+        """Non-streaming invocation.
 
         Args:
-            prompt: User prompt
-            system_prompt: Optional system prompt
-            stream: Whether to stream the response (yields text chunks if True)
+            inputs: Dictionary containing question and chat_history
 
         Returns:
-            Generator that yields text chunks. For non-streaming, yields complete response as single chunk.
+            Generated response as a string
         """
         pass
 
     @abstractmethod
-    def create_rag_chain(
-        self,
-        retriever: Any,
-        memory: Any,
-        system_prompt: str,
-    ) -> Any:
-        """Create a RAG chain with memory for this LLM.
+    def stream(self, inputs: dict) -> Iterator[str]:
+        """Streaming invocation.
 
         Args:
-            retriever: Vector store retriever
-            memory: Chat message history
-            system_prompt: System prompt template
+            inputs: Dictionary containing question and chat_history
 
-        Returns:
-            LangChain runnable chain
+        Yields:
+            Response tokens/chunks as strings
         """
         pass
 

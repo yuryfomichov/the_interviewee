@@ -1,7 +1,7 @@
 """OpenAI API implementation."""
 
 import logging
-from collections.abc import Generator
+from collections.abc import Iterator
 from typing import Any
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -17,25 +17,46 @@ logger = logging.getLogger(__name__)
 class OpenAILLM(LLMInterface):
     """OpenAI API implementation."""
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, retriever: Any = None, user_name: str = ""):
         """Initialize OpenAI LLM.
 
         Args:
             config: Configuration instance (creates new if None)
+            retriever: Vector store retriever for RAG
+            user_name: Name of the user/candidate
         """
         self.config = config or get_config()
 
         if not self.config.openai_api_key:
             raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
 
-        # Import openai only when needed
-        try:
-            from openai import OpenAI
+        self.retriever = retriever
+        self.system_prompt = self.get_system_prompt(user_name) if user_name else ""
 
-            self.client = OpenAI(api_key=self.config.openai_api_key)
-            logger.info(f"Initialized OpenAI client with model: {self.config.openai_model_name}")
-        except ImportError:
-            raise ImportError("OpenAI package not installed. Install with: pip install openai")
+        # Create LangChain ChatOpenAI instance
+        self.llm = ChatOpenAI(
+            model=self.config.openai_model_name,
+            temperature=self.config.openai_temperature,
+            max_completion_tokens=self.config.openai_max_tokens,
+            streaming=True,
+        )
+
+        # Create prompt template
+        self.prompt_template = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    f"""{self.system_prompt}
+
+Context from your career:
+{{context}}""",
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{question}"),
+            ]
+        ) if self.system_prompt else None
+
+        logger.info(f"Initialized OpenAI LLM with model: {self.config.openai_model_name}")
 
     def get_system_prompt(self, user_name: str) -> str:
         """Get the system prompt for OpenAI models.
@@ -48,190 +69,92 @@ class OpenAILLM(LLMInterface):
         """
         return get_system_prompt(user_name)
 
-    def generate(
-        self, prompt: str, system_prompt: str | None = None, stream: bool = False
-    ) -> Generator[str]:
-        """Generate response from OpenAI API.
-
-        Args:
-            prompt: User prompt
-            system_prompt: Optional system prompt
-            stream: Whether to stream the response
-
-        Returns:
-            Generator that yields text chunks
-        """
-        messages = []
-
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-
-        messages.append({"role": "user", "content": prompt})
-
-        # GPT-5 models use max_completion_tokens instead of max_tokens
-        is_gpt5_model = self.config.openai_model_name.startswith("gpt-5")
-
-        try:
-            if stream and not is_gpt5_model:
-                # Streaming response (GPT-5 models require verified org for streaming)
-                response = self.client.chat.completions.create(
-                    model=self.config.openai_model_name,
-                    messages=messages,
-                    max_tokens=self.config.openai_max_tokens,
-                    temperature=self.config.openai_temperature,
-                    stream=True,
-                )
-
-                for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        yield chunk.choices[0].delta.content
-            elif stream and is_gpt5_model:
-                # GPT-5 models: streaming requires verified org, so fall back to non-streaming
-                # and simulate streaming by yielding the full response
-                logger.warning(
-                    "GPT-5 streaming requires verified organization. Using non-streaming mode."
-                )
-                response = self.client.chat.completions.create(
-                    model=self.config.openai_model_name,
-                    messages=messages,
-                    max_completion_tokens=self.config.openai_max_tokens,
-                )
-                content = response.choices[0].message.content
-                if content:
-                    yield content
+    def _format_docs(self, docs):
+        """Format retrieved documents into context string."""
+        if not docs:
+            return "No specific career information retrieved."
+        context_parts = []
+        for i, doc in enumerate(docs, 1):
+            # Handle both Document objects and strings
+            if isinstance(doc, str):
+                context_parts.append(f"[Source {i}]\n{doc}\n")
             else:
-                # Non-streaming response - yield as single chunk
-                if is_gpt5_model:
-                    # GPT-5 models don't support custom temperature, only use max_completion_tokens
-                    response = self.client.chat.completions.create(
-                        model=self.config.openai_model_name,
-                        messages=messages,
-                        max_completion_tokens=self.config.openai_max_tokens,
-                    )
-                else:
-                    response = self.client.chat.completions.create(
-                        model=self.config.openai_model_name,
-                        messages=messages,
-                        max_tokens=self.config.openai_max_tokens,
-                        temperature=self.config.openai_temperature,
-                    )
+                source = (
+                    doc.metadata.get("source", "Unknown") if hasattr(doc, "metadata") else "Unknown"
+                )
+                source_name = source.split("/")[-1] if "/" in source else source
+                page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
+                context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
+        return "\n".join(context_parts)
 
-                content = response.choices[0].message.content
-                yield content.strip() if content else ""
-
-        except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise
-
-    def create_rag_chain(
-        self,
-        retriever: Any,
-        memory: Any,  # noqa: ARG002 - kept for API compatibility
-        system_prompt: str,
-    ) -> Any:
-        """Create a RAG chain with memory for OpenAI.
+    def invoke(self, inputs: dict) -> str:
+        """Non-streaming invocation.
 
         Args:
-            retriever: Vector store retriever
-            memory: Chat message history (not used - history managed externally)
-            system_prompt: System prompt template
+            inputs: Dictionary containing question and chat_history
 
         Returns:
-            Callable that generates responses with streaming support
+            Generated response as a string
         """
-        # Create LangChain ChatOpenAI instance
-        langchain_llm = ChatOpenAI(
-            model=self.config.openai_model_name,
-            temperature=self.config.openai_temperature,
-            max_completion_tokens=self.config.openai_max_tokens,
-            streaming=True,
+        if not self.llm or not self.prompt_template:
+            raise RuntimeError("LLM not initialized properly.")
+
+        question = inputs.get("question", "")
+        chat_history = inputs.get("chat_history", [])
+
+        # Get context from retriever
+        docs = self.retriever.invoke(question)
+        context = self._format_docs(docs)
+
+        # Format prompt
+        messages = self.prompt_template.format_messages(
+            context=context,
+            chat_history=chat_history,
+            question=question,
         )
 
-        # Format docs helper
-        def format_docs(docs):
-            if not docs:
-                return "No specific career information retrieved."
-            context_parts = []
-            for i, doc in enumerate(docs, 1):
-                # Handle both Document objects and strings
-                if isinstance(doc, str):
-                    context_parts.append(f"[Source {i}]\n{doc}\n")
-                else:
-                    source = (
-                        doc.metadata.get("source", "Unknown")
-                        if hasattr(doc, "metadata")
-                        else "Unknown"
-                    )
-                    source_name = source.split("/")[-1] if "/" in source else source
-                    page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
-                    context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
-            return "\n".join(context_parts)
+        # Generate response (non-streaming)
+        response = self.llm.invoke(messages)
+        content = response.content
+        # Ensure we return a string
+        if isinstance(content, str):
+            return content
+        return str(content)
 
-        # Create a simple chain object that supports both streaming and non-streaming
-        class OpenAIRAGChain:
-            """Simple RAG chain for OpenAI that properly supports streaming."""
+    def stream(self, inputs: dict) -> Iterator[str]:
+        """Streaming invocation.
 
-            def __init__(self, llm, retriever, system_prompt):
-                self.llm = llm
-                self.retriever = retriever
-                self.system_prompt = system_prompt
+        Args:
+            inputs: Dictionary containing question and chat_history
 
-                # Create prompt template
-                self.prompt = ChatPromptTemplate.from_messages(
-                    [
-                        (
-                            "system",
-                            f"""{system_prompt}
+        Yields:
+            Response tokens/chunks as strings
+        """
+        if not self.llm or not self.prompt_template:
+            raise RuntimeError("LLM not initialized properly.")
 
-Context from your career:
-{{context}}""",
-                        ),
-                        MessagesPlaceholder(variable_name="chat_history"),
-                        ("human", "{question}"),
-                    ]
-                )
+        question = inputs.get("question", "")
+        chat_history = inputs.get("chat_history", [])
 
-            def invoke(self, inputs: dict, config: dict | None = None) -> Any:  # noqa: ARG002
-                """Non-streaming invocation."""
-                question = inputs.get("question", "")
-                chat_history = inputs.get("chat_history", [])
+        # Get context from retriever
+        docs = self.retriever.invoke(question)
+        context = self._format_docs(docs)
 
-                # Get context from retriever
-                docs = self.retriever.invoke(question)
-                context = format_docs(docs)
+        # Format prompt
+        messages = self.prompt_template.format_messages(
+            context=context,
+            chat_history=chat_history,
+            question=question,
+        )
 
-                # Format prompt
-                messages = self.prompt.format_messages(
-                    context=context,
-                    chat_history=chat_history,
-                    question=question,
-                )
-
-                # Generate response (non-streaming)
-                response = self.llm.invoke(messages)
-                return response.content
-
-            def stream(self, inputs: dict, config: dict | None = None):  # noqa: ARG002
-                """Streaming invocation."""
-                question = inputs.get("question", "")
-                chat_history = inputs.get("chat_history", [])
-
-                # Get context from retriever
-                docs = self.retriever.invoke(question)
-                context = format_docs(docs)
-
-                # Format prompt
-                messages = self.prompt.format_messages(
-                    context=context,
-                    chat_history=chat_history,
-                    question=question,
-                )
-
-                # Stream response
-                for chunk in self.llm.stream(messages):
-                    yield chunk.content
-
-        return OpenAIRAGChain(langchain_llm, retriever, system_prompt)
+        # Stream response
+        for chunk in self.llm.stream(messages):
+            content = chunk.content
+            # Ensure we yield strings
+            if isinstance(content, str):
+                yield content
+            elif content:
+                yield str(content)
 
     def __repr__(self) -> str:
         """String representation of the LLM."""

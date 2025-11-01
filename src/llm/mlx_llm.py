@@ -1,7 +1,7 @@
 """Apple Silicon optimized LLM using MLX."""
 
 import logging
-from collections.abc import Generator
+from collections.abc import Iterator
 from typing import Any
 
 from mlx_lm.generate import stream_generate
@@ -17,11 +17,13 @@ logger = logging.getLogger(__name__)
 class MLXLocalLLM(LLMInterface):
     """Apple Silicon optimized LLM using MLX with LangChain integration."""
 
-    def __init__(self, config=None):
-        """Initialize MLX LLM using both LangChain MLXPipeline and direct mlx_lm.
+    def __init__(self, config=None, retriever: Any = None, user_name: str = ""):
+        """Initialize MLX LLM using mlx_lm directly.
 
         Args:
             config: Configuration instance (creates new if None)
+            retriever: Vector store retriever for RAG
+            user_name: Name of the user/candidate
         """
         self.config = config or get_config()
 
@@ -47,6 +49,11 @@ class MLXLocalLLM(LLMInterface):
 
             # Don't load a second copy via MLXPipeline - use mlx_lm directly for everything
             self.mlx_pipeline = None
+
+            # Set retriever and system prompt
+            self.retriever = retriever
+            self.system_prompt = self.get_system_prompt(user_name) if user_name else ""
+
             logger.info("Model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
@@ -73,174 +80,102 @@ class MLXLocalLLM(LLMInterface):
         # Default prompt for other models
         return get_system_prompt(user_name)
 
-    def generate(
-        self, prompt: str, system_prompt: str | None = None, stream: bool = False
-    ) -> Generator[str]:
-        """Generate response using MLX.
-
-        Args:
-            prompt: User prompt
-            system_prompt: Optional system prompt
-            stream: Whether to stream the response (yields tokens)
-
-        Returns:
-            Generator that yields text chunks
-        """
-        # Format prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-        else:
-            full_prompt = prompt
-
-        try:
-            if stream:
-                # Stream using mlx_lm directly (MLXPipeline streaming is broken)
-                for generation_response in stream_generate(
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    prompt=full_prompt,
-                    max_tokens=self.config.local_model_max_tokens,
-                ):
-                    # stream_generate yields GenerationResponse objects with a text attribute
-                    yield generation_response.text
+    def _format_docs(self, docs):
+        """Format retrieved documents into context string."""
+        if not docs:
+            return "No specific career information retrieved."
+        context_parts = []
+        for i, doc in enumerate(docs, 1):
+            # Handle both Document objects and strings
+            if isinstance(doc, str):
+                context_parts.append(f"[Source {i}]\n{doc}\n")
             else:
-                # Non-streaming: use mlx_lm generate and collect full response
-                from mlx_lm.generate import generate as mlx_generate
-
-                response = mlx_generate(
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    prompt=full_prompt,
-                    max_tokens=self.config.local_model_max_tokens,
-                    verbose=False,
+                # Document object with metadata
+                source = (
+                    doc.metadata.get("source", "Unknown") if hasattr(doc, "metadata") else "Unknown"
                 )
-                yield response.strip() if response else ""
-        except Exception as e:
-            logger.error(f"Generation error: {e}")
-            raise
+                source_name = source.split("/")[-1] if "/" in source else source
+                page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
+                context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
+        return "\n".join(context_parts)
 
-    def create_rag_chain(
-        self,
-        retriever: Any,
-        memory: Any,  # noqa: ARG002 - kept for API compatibility
-        system_prompt: str,
-    ) -> Any:
-        """Create a RAG chain with memory for MLX.
+    def _format_prompt(self, question: str, chat_history: list, context: str) -> str:
+        """Format the full prompt with system prompt, context, history, and question."""
+        # Format chat history
+        history_str = ""
+        if chat_history:
+            for msg in chat_history:
+                role = "Human" if hasattr(msg, "type") and msg.type == "human" else "AI"
+                content = msg.content if hasattr(msg, "content") else str(msg)
+                history_str += f"{role}: {content}\n"
+
+        # Use the format_rag_prompt function from prompts module
+        return format_rag_prompt(
+            system_prompt=self.system_prompt,
+            context=context,
+            chat_history=history_str,
+            question=question,
+        )
+
+    def invoke(self, inputs: dict) -> str:
+        """Non-streaming invocation.
 
         Args:
-            retriever: Vector store retriever
-            memory: Chat message history (not used - history managed externally)
-            system_prompt: System prompt template
+            inputs: Dictionary containing question and chat_history
 
         Returns:
-            Callable that generates responses with streaming support
+            Generated response as a string
         """
-        # Use MLXPipeline directly (ChatMLX doesn't work well with ChatPromptTemplate)
-        # We format the prompt as a string instead of using chat messages
+        question = inputs.get("question", "")
+        chat_history = inputs.get("chat_history", [])
 
-        # Format docs helper
-        def format_docs(docs):
-            if not docs:
-                return "No specific career information retrieved."
-            context_parts = []
-            for i, doc in enumerate(docs, 1):
-                # Handle both Document objects and strings
-                if isinstance(doc, str):
-                    context_parts.append(f"[Source {i}]\n{doc}\n")
-                else:
-                    # Document object with metadata
-                    source = (
-                        doc.metadata.get("source", "Unknown")
-                        if hasattr(doc, "metadata")
-                        else "Unknown"
-                    )
-                    source_name = source.split("/")[-1] if "/" in source else source
-                    page_content = doc.page_content if hasattr(doc, "page_content") else str(doc)
-                    context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
-            return "\n".join(context_parts)
+        # Get context from retriever
+        docs = self.retriever.invoke(question) if self.retriever else []
+        context = self._format_docs(docs)
 
-        # Create a simple chain object that supports both streaming and non-streaming
-        class MLXRAGChain:
-            """Simple RAG chain for MLX that properly supports streaming."""
+        # Format prompt
+        full_prompt = self._format_prompt(question, chat_history, context)
 
-            def __init__(self, retriever, system_prompt, model, tokenizer, max_tokens):
-                self.retriever = retriever
-                self.system_prompt = system_prompt
-                self.model = model
-                self.tokenizer = tokenizer
-                self.max_tokens = max_tokens
+        # Generate response (non-streaming) using mlx_lm directly
+        from mlx_lm.generate import generate as mlx_generate
 
-            def _format_prompt(self, question: str, chat_history: list, context: str) -> str:
-                """Format the full prompt."""
-                # Format chat history
-                history_str = ""
-                if chat_history:
-                    for msg in chat_history:
-                        role = "Human" if hasattr(msg, "type") and msg.type == "human" else "AI"
-                        content = msg.content if hasattr(msg, "content") else str(msg)
-                        history_str += f"{role}: {content}\n"
-
-                # Use the format_rag_prompt function from prompts module
-                return format_rag_prompt(
-                    system_prompt=self.system_prompt,
-                    context=context,
-                    chat_history=history_str,
-                    question=question,
-                )
-
-            def invoke(self, inputs: dict, config: dict | None = None) -> Any:  # noqa: ARG002
-                """Non-streaming invocation."""
-                question = inputs.get("question", "")
-                chat_history = inputs.get("chat_history", [])
-
-                # Get context from retriever
-                docs = self.retriever.invoke(question)
-                context = format_docs(docs)
-
-                # Format prompt
-                full_prompt = self._format_prompt(question, chat_history, context)
-
-                # Generate response (non-streaming) using mlx_lm directly
-                from mlx_lm.generate import generate as mlx_generate
-
-                response = mlx_generate(
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    prompt=full_prompt,
-                    max_tokens=self.max_tokens,
-                    verbose=False,
-                )
-                return response
-
-            def stream(self, inputs: dict, config: dict | None = None):  # noqa: ARG002
-                """Streaming invocation."""
-                question = inputs.get("question", "")
-                chat_history = inputs.get("chat_history", [])
-
-                # Get context from retriever
-                docs = self.retriever.invoke(question)
-                context = format_docs(docs)
-
-                # Format prompt
-                full_prompt = self._format_prompt(question, chat_history, context)
-
-                # Stream response using mlx_lm directly (MLXPipeline streaming is broken)
-                for generation_response in stream_generate(
-                    model=self.model,
-                    tokenizer=self.tokenizer,
-                    prompt=full_prompt,
-                    max_tokens=self.max_tokens,
-                ):
-                    # stream_generate yields GenerationResponse objects with a text attribute
-                    yield generation_response.text
-
-        return MLXRAGChain(
-            retriever,
-            system_prompt,
-            self.model,
-            self.tokenizer,
-            self.config.local_model_max_tokens,
+        response = mlx_generate(
+            model=self.model,
+            tokenizer=self.tokenizer,
+            prompt=full_prompt,
+            max_tokens=self.config.local_model_max_tokens,
+            verbose=False,
         )
+        return response
+
+    def stream(self, inputs: dict) -> Iterator[str]:
+        """Streaming invocation.
+
+        Args:
+            inputs: Dictionary containing question and chat_history
+
+        Yields:
+            Response tokens/chunks as strings
+        """
+        question = inputs.get("question", "")
+        chat_history = inputs.get("chat_history", [])
+
+        # Get context from retriever
+        docs = self.retriever.invoke(question) if self.retriever else []
+        context = self._format_docs(docs)
+
+        # Format prompt
+        full_prompt = self._format_prompt(question, chat_history, context)
+
+        # Stream response using mlx_lm directly (MLXPipeline streaming is broken)
+        for generation_response in stream_generate(
+            model=self.model,
+            tokenizer=self.tokenizer,
+            prompt=full_prompt,
+            max_tokens=self.config.local_model_max_tokens,
+        ):
+            # stream_generate yields GenerationResponse objects with a text attribute
+            yield generation_response.text
 
     def __repr__(self) -> str:
         """String representation of the LLM."""

@@ -6,7 +6,7 @@ import gradio as gr
 from gradio.themes import Soft
 
 from src.config import get_config
-from src.rag_engine import RAGEngine
+from src.rag_engine import create_rag_engine
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class InterviewApp:
         """Initialize the RAG engine."""
         logger.info("Initializing RAG engine...")
         try:
-            self.engine = RAGEngine.create_default(self.config)
+            self.engine = create_rag_engine(self.config)
             logger.info("RAG engine initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize RAG engine: {e}")

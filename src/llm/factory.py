@@ -23,11 +23,13 @@ if IS_APPLE_SILICON:
 logger = logging.getLogger(__name__)
 
 
-def create_llm(config=None) -> LLMInterface:
+def create_llm(config=None, retriever=None, user_name: str = "") -> LLMInterface:
     """Factory function to create appropriate LLM based on configuration and platform.
 
     Args:
         config: Configuration instance (creates new if None)
+        retriever: Vector store retriever for RAG
+        user_name: Name of the user/candidate
 
     Returns:
         LLM interface instance
@@ -42,7 +44,7 @@ def create_llm(config=None) -> LLMInterface:
             logger.info("Creating local LLM with MLX (Apple Silicon optimized)")
             from src.llm.mlx_llm import MLXLocalLLM
 
-            return MLXLocalLLM(config)
+            return MLXLocalLLM(config=config, retriever=retriever, user_name=user_name)
         else:
             raise ImportError(
                 "Local models require MLX on Apple Silicon. Install with: pip install mlx mlx-lm"
@@ -51,6 +53,6 @@ def create_llm(config=None) -> LLMInterface:
         logger.info("Creating OpenAI LLM")
         from src.llm.openai_llm import OpenAILLM
 
-        return OpenAILLM(config)
+        return OpenAILLM(config=config, retriever=retriever, user_name=user_name)
     else:
         raise ValueError(f"Unknown model provider: {provider}. Choose 'local' or 'openai'.")
