@@ -220,6 +220,12 @@ class Config:
         """Check if conversation history should be enabled."""
         return self.get("ui.enable_history", True)
 
+    # Launcher configuration
+    @property
+    def launcher_type(self) -> str:
+        """Get launcher type (gradio, cli)."""
+        return os.getenv("LAUNCHER_TYPE", "gradio").lower()
+
     # Gradio server configuration
     @property
     def gradio_server_name(self) -> str:
