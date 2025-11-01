@@ -26,9 +26,11 @@ def create_rag_engine(config: Config | None = None) -> RAGEngine:
     document_loader = create_document_loader(config)
     document_loader.initialize()
 
-    # Create LLM with retriever and user name
-    # The LLM will set up its system prompt internally
-    llm = create_llm(
+    # Create LLM
+    llm = create_llm()
+
+    # Initialize LLM with config, retriever and user name
+    llm.initialize(
         config=config,
         retriever=document_loader.get_retriever(),
         user_name=config.user_name,

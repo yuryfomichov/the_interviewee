@@ -2,6 +2,26 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from typing import TYPE_CHECKING
+
+from langchain_core.messages import BaseMessage
+from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from langchain_core.retrievers import BaseRetriever
+
+    from src.config import Config
+
+
+class LLMInputs(BaseModel):
+    """Input model for LLM invoke and stream methods."""
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    question: str = Field(..., description="The user's question")
+    chat_history: list[BaseMessage] = Field(
+        default_factory=list, description="Chat message history (LangChain message objects)"
+    )
 
 
 class LLMInterface(ABC):
@@ -11,26 +31,24 @@ class LLMInterface(ABC):
     """
 
     @abstractmethod
-    def get_system_prompt(self, user_name: str) -> str:
-        """Get the system prompt for this LLM.
+    def initialize(self, config: "Config", retriever: "BaseRetriever", user_name: str) -> None:
+        """Initialize the LLM with config, retriever and user name.
 
-        Each LLM implementation can customize the system prompt based on
-        its specific capabilities and requirements.
+        Must be called before invoke() or stream().
 
         Args:
+            config: Configuration instance
+            retriever: Vector store retriever for RAG
             user_name: Name of the user/candidate
-
-        Returns:
-            System prompt string
         """
         pass
 
     @abstractmethod
-    def invoke(self, inputs: dict) -> str:
+    def invoke(self, inputs: LLMInputs) -> str:
         """Non-streaming invocation.
 
         Args:
-            inputs: Dictionary containing question and chat_history
+            inputs: LLM inputs containing question and chat_history
 
         Returns:
             Generated response as a string
@@ -38,11 +56,11 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    def stream(self, inputs: dict) -> Iterator[str]:
+    def stream(self, inputs: LLMInputs) -> Iterator[str]:
         """Streaming invocation.
 
         Args:
-            inputs: Dictionary containing question and chat_history
+            inputs: LLM inputs containing question and chat_history
 
         Yields:
             Response tokens/chunks as strings

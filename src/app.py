@@ -40,7 +40,7 @@ class InterviewApp:
             logger.error(f"Failed to initialize RAG engine: {e}")
             raise
 
-    def chat(self, message: str, history: list):
+    async def chat(self, message: str, history: list):
         """Process chat message and stream response.
 
         Args:
@@ -126,12 +126,22 @@ class InterviewApp:
 
             # Information section
             with gr.Accordion("About", open=False):
+                # Get model name and device info
+                provider = self.config.model_provider
+                model_name = self.config.get_model_name()
+
+                if provider == "openai":
+                    device_info = "Cloud (OpenAI API)"
+                else:
+                    settings = self.config.get_model_settings()
+                    device_info = settings.device if hasattr(settings, "device") else "N/A"
+
                 gr.Markdown(
                     f"""
                     ### System Information
-                    - **Model Provider**: {self.config.model_provider}
-                    - **Model**: {self.config.local_model_name if self.config.model_provider == "local" else self.config.openai_model_name}
-                    - **Device**: {self.config.local_model_device}
+                    - **Model Provider**: {provider}
+                    - **Model**: {model_name}
+                    - **Device**: {device_info}
                     - **Embedding Model**: {self.config.embedding_model}
 
                     ### How it works

@@ -1,7 +1,7 @@
 """Prompt templates for the AI Interviewee system."""
 
 
-def get_system_prompt(user_name: str) -> str:
+def get_default_system_prompt(user_name: str) -> str:
     """Get the main system prompt for the interview assistant.
 
     Args:

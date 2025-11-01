@@ -2,14 +2,16 @@
 
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Callable
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI
 
-from src.config import get_config
-from src.llm.base import LLMInterface
-from src.prompts import get_system_prompt
+from src.llm.base import LLMInputs, LLMInterface
+
+if TYPE_CHECKING:
+    from src.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -17,27 +19,50 @@ logger = logging.getLogger(__name__)
 class OpenAILLM(LLMInterface):
     """OpenAI API implementation."""
 
-    def __init__(self, config=None, retriever: Any = None, user_name: str = ""):
+    def __init__(self, system_prompt_fn: Callable[[str], str]):
         """Initialize OpenAI LLM.
 
         Args:
-            config: Configuration instance (creates new if None)
+            system_prompt_fn: Function that takes user_name and returns system prompt
+
+        Call initialize() before using invoke() or stream().
+        """
+        self.system_prompt_fn = system_prompt_fn
+
+        # These will be set during initialize()
+        self.config: Config
+        self.llm: ChatOpenAI
+        self.retriever: BaseRetriever
+        self.system_prompt: str
+        self.prompt_template: ChatPromptTemplate
+
+    def initialize(self, config, retriever: BaseRetriever, user_name: str) -> None:
+        """Initialize the LLM with config, retriever and user name.
+
+        Args:
+            config: Configuration instance
             retriever: Vector store retriever for RAG
             user_name: Name of the user/candidate
         """
-        self.config = config or get_config()
+        self.config = config
 
         if not self.config.openai_api_key:
             raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
 
         self.retriever = retriever
-        self.system_prompt = self.get_system_prompt(user_name) if user_name else ""
+        self.system_prompt = self.system_prompt_fn(user_name)
+
+        # Get model settings
+        self.settings = self.config.get_model_settings()
+
+        # Get model name from config
+        model_name = self.config.get_model_name()
 
         # Create LangChain ChatOpenAI instance
         self.llm = ChatOpenAI(
-            model=self.config.openai_model_name,
-            temperature=self.config.openai_temperature,
-            max_completion_tokens=self.config.openai_max_tokens,
+            model=model_name,
+            temperature=self.settings.temperature,
+            max_completion_tokens=self.settings.max_tokens,
             streaming=True,
         )
 
@@ -54,23 +79,11 @@ Context from your career:
                 MessagesPlaceholder(variable_name="chat_history"),
                 ("human", "{question}"),
             ]
-        ) if self.system_prompt else None
+        )
 
-        logger.info(f"Initialized OpenAI LLM with model: {self.config.openai_model_name}")
-
-    def get_system_prompt(self, user_name: str) -> str:
-        """Get the system prompt for OpenAI models.
-
-        Args:
-            user_name: Name of the user/candidate
-
-        Returns:
-            System prompt string optimized for OpenAI models
-        """
-        return get_system_prompt(user_name)
+        logger.info(f"OpenAI LLM initialized with model: {model_name}")
 
     def _format_docs(self, docs):
-        """Format retrieved documents into context string."""
         if not docs:
             return "No specific career information retrieved."
         context_parts = []
@@ -87,20 +100,9 @@ Context from your career:
                 context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
         return "\n".join(context_parts)
 
-    def invoke(self, inputs: dict) -> str:
-        """Non-streaming invocation.
-
-        Args:
-            inputs: Dictionary containing question and chat_history
-
-        Returns:
-            Generated response as a string
-        """
-        if not self.llm or not self.prompt_template:
-            raise RuntimeError("LLM not initialized properly.")
-
-        question = inputs.get("question", "")
-        chat_history = inputs.get("chat_history", [])
+    def invoke(self, inputs: LLMInputs) -> str:
+        question = inputs.question
+        chat_history = inputs.chat_history
 
         # Get context from retriever
         docs = self.retriever.invoke(question)
@@ -121,20 +123,9 @@ Context from your career:
             return content
         return str(content)
 
-    def stream(self, inputs: dict) -> Iterator[str]:
-        """Streaming invocation.
-
-        Args:
-            inputs: Dictionary containing question and chat_history
-
-        Yields:
-            Response tokens/chunks as strings
-        """
-        if not self.llm or not self.prompt_template:
-            raise RuntimeError("LLM not initialized properly.")
-
-        question = inputs.get("question", "")
-        chat_history = inputs.get("chat_history", [])
+    def stream(self, inputs: LLMInputs) -> Iterator[str]:
+        question = inputs.question
+        chat_history = inputs.chat_history
 
         # Get context from retriever
         docs = self.retriever.invoke(question)
@@ -158,4 +149,4 @@ Context from your career:
 
     def __repr__(self) -> str:
         """String representation of the LLM."""
-        return f"OpenAILLM(model={self.config.openai_model_name})"
+        return f"OpenAILLM(model={self.config.get_model_name()})"

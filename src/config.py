@@ -7,11 +7,27 @@ from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 # Load environment variables from .env file
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+class MLXModelSettings(BaseModel):
+    """Settings for MLX-based models (Qwen, Llama)."""
+
+    device: str = Field(default="mps", description="Device to run the model on (mps, cuda, cpu)")
+    max_new_tokens: int = Field(default=512, description="Maximum number of tokens to generate")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+
+
+class OpenAIModelSettings(BaseModel):
+    """Settings for OpenAI API models."""
+
+    max_tokens: int = Field(default=1024, description="Maximum number of tokens to generate")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
 
 
 class Config:
@@ -27,6 +43,7 @@ class Config:
         self._config: dict[str, Any] = {}
         self._load_config()
         self._setup_logging()
+        self._load_model_settings()
 
     def _load_config(self) -> None:
         """Load configuration from YAML file."""
@@ -46,6 +63,26 @@ class Config:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
+
+    def _load_model_settings(self) -> None:
+        """Load and validate model settings using Pydantic."""
+        # Mapping of provider to settings model
+        provider_settings_models = {
+            "qwen": MLXModelSettings,
+            "llama": MLXModelSettings,
+            "openai": OpenAIModelSettings,
+        }
+
+        # Load settings for each provider
+        self.model_settings: dict[str, MLXModelSettings | OpenAIModelSettings] = {}
+        for provider, settings_model in provider_settings_models.items():
+            settings_dict = self.get(f"model.{provider}.settings", {})
+            try:
+                self.model_settings[provider] = settings_model(**settings_dict)
+                logger.info(f"Loaded {provider} settings: {self.model_settings[provider]}")
+            except Exception as e:
+                logger.warning(f"Failed to load {provider} settings: {e}. Using defaults.")
+                self.model_settings[provider] = settings_model()
 
     def get(self, key_path: str, default: Any = None) -> Any:
         """Get configuration value using dot notation.
@@ -71,28 +108,25 @@ class Config:
     # Model configuration properties
     @property
     def model_provider(self) -> str:
-        """Get the LLM provider (local, openai)."""
-        return os.getenv("MODEL_PROVIDER", self.get("model.provider", "local"))
+        """Get the LLM provider (qwen, llama, openai)."""
+        return os.getenv("MODEL_PROVIDER", self.get("model.provider", "qwen"))
 
-    @property
-    def local_model_name(self) -> str:
-        """Get the local model name."""
-        return os.getenv("LOCAL_MODEL_NAME", self.get("model.local.model_name"))
+    def get_model_name(self) -> str:
+        """Get the model name for the current provider.
 
-    @property
-    def local_model_device(self) -> str:
-        """Get the device for local model (mps, cuda, cpu)."""
-        return os.getenv("DEVICE", self.get("model.local.device", "cpu"))
+        Returns:
+            Model name for the current provider
+        """
+        return os.getenv("MODEL_NAME", self.get(f"model.{self.model_provider}.model_name", ""))
 
-    @property
-    def local_model_max_tokens(self) -> int:
-        """Get max new tokens for local model."""
-        return self.get("model.local.max_new_tokens", 512)
+    def get_model_settings(self) -> MLXModelSettings | OpenAIModelSettings:
+        """Get Pydantic settings model for a specific provider.
 
-    @property
-    def local_model_temperature(self) -> float:
-        """Get temperature for local model."""
-        return self.get("model.local.temperature", 0.7)
+
+        Returns:
+            Pydantic settings model for the provider
+        """
+        return self.model_settings.get(self.model_provider, MLXModelSettings())
 
     @property
     def openai_api_key(self) -> str | None:
@@ -103,21 +137,6 @@ class Config:
     def huggingface_token(self) -> str | None:
         """Get HuggingFace token from environment."""
         return os.getenv("HUGGINGFACE_TOKEN")
-
-    @property
-    def openai_model_name(self) -> str:
-        """Get OpenAI model name."""
-        return self.get("model.openai.model_name", "gpt-4")
-
-    @property
-    def openai_max_tokens(self) -> int:
-        """Get max tokens for OpenAI model."""
-        return self.get("model.openai.max_tokens", 1024)
-
-    @property
-    def openai_temperature(self) -> float:
-        """Get temperature for OpenAI model."""
-        return self.get("model.openai.temperature", 0.7)
 
     # RAG configuration properties
     @property
@@ -219,7 +238,10 @@ class Config:
 
     def __repr__(self) -> str:
         """String representation of configuration."""
-        return f"Config(provider={self.model_provider}, device={self.local_model_device})"
+        settings = self.get_model_settings()
+        if isinstance(settings, MLXModelSettings):
+            return f"Config(provider={self.model_provider}, device={settings.device})"
+        return f"Config(provider={self.model_provider})"
 
 
 # Global configuration instance

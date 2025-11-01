@@ -5,6 +5,7 @@ import platform
 
 from src.config import get_config
 from src.llm.base import LLMInterface
+from src.prompts import get_default_system_prompt, get_system_prompt_for_qwen
 
 # Detect if we're on Apple Silicon
 IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm64"
@@ -22,37 +23,56 @@ if IS_APPLE_SILICON:
 
 logger = logging.getLogger(__name__)
 
+# Provider configuration mapping
+PROVIDER_CONFIG = {
+    "qwen": {
+        "backend": "mlx",
+        "system_prompt_fn": get_system_prompt_for_qwen,
+    },
+    "llama": {
+        "backend": "mlx",
+        "system_prompt_fn": get_default_system_prompt,
+    },
+    "openai": {
+        "backend": "openai",
+        "system_prompt_fn": get_default_system_prompt,
+    },
+}
 
-def create_llm(config=None, retriever=None, user_name: str = "") -> LLMInterface:
-    """Factory function to create appropriate LLM based on configuration and platform.
 
-    Args:
-        config: Configuration instance (creates new if None)
-        retriever: Vector store retriever for RAG
-        user_name: Name of the user/candidate
+def create_llm() -> LLMInterface:
+    """Factory function to create appropriate LLM based on platform.
 
     Returns:
-        LLM interface instance
+        Uninitialized LLM interface instance (call initialize() before use)
     """
-    config = config or get_config()
-
+    config = get_config()
     provider = config.model_provider.lower()
 
-    if provider == "local":
-        # Use MLX for Apple Silicon
+    # Check if provider is valid
+    if provider not in PROVIDER_CONFIG:
+        valid_providers = ", ".join(f"'{p}'" for p in PROVIDER_CONFIG.keys())
+        raise ValueError(f"Unknown model provider: {provider}. Choose from: {valid_providers}")
+
+    provider_config = PROVIDER_CONFIG[provider]
+    backend = provider_config["backend"]
+    system_prompt_fn = provider_config["system_prompt_fn"]
+
+    if backend == "mlx":
+        # Use MLX for Apple Silicon (qwen, llama)
         if IS_APPLE_SILICON and MLX_AVAILABLE:
-            logger.info("Creating local LLM with MLX (Apple Silicon optimized)")
+            logger.info(f"Creating {provider} LLM with MLX (Apple Silicon optimized)")
             from src.llm.mlx_llm import MLXLocalLLM
 
-            return MLXLocalLLM(config=config, retriever=retriever, user_name=user_name)
+            return MLXLocalLLM(system_prompt_fn=system_prompt_fn)
         else:
             raise ImportError(
-                "Local models require MLX on Apple Silicon. Install with: pip install mlx mlx-lm"
+                f"{provider} models require MLX on Apple Silicon. Install with: pip install mlx mlx-lm"
             )
-    elif provider == "openai":
+    elif backend == "openai":
         logger.info("Creating OpenAI LLM")
         from src.llm.openai_llm import OpenAILLM
 
-        return OpenAILLM(config=config, retriever=retriever, user_name=user_name)
+        return OpenAILLM(system_prompt_fn=system_prompt_fn)
     else:
-        raise ValueError(f"Unknown model provider: {provider}. Choose 'local' or 'openai'.")
+        raise ValueError(f"Unknown backend: {backend}")

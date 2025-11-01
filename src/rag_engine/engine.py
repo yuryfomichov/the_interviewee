@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from langchain_community.chat_message_histories import ChatMessageHistory
 
 from src.config import Config, get_config
-from src.llm.base import LLMInterface
+from src.llm.base import LLMInputs, LLMInterface
 from src.prompts import OUT_OF_SCOPE_RESPONSE
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class RAGEngine:
             chat_history = self.memory.messages if use_history else []
 
             # Prepare inputs
-            inputs = {"question": question, "chat_history": chat_history}
+            inputs = LLMInputs(question=question, chat_history=chat_history)
 
             # Collect full response for history
             full_response = ""

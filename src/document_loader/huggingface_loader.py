@@ -37,8 +37,12 @@ class HuggingFaceDocumentLoader(DocumentLoaderInterface):
         """Initialize HuggingFace embedding model."""
         logger.info(f"Loading embedding model: {self.config.embedding_model}")
 
+        # Get device from current model settings (defaults to cpu if OpenAI)
+        settings = self.config.get_model_settings()
+        device = settings.device if hasattr(settings, "device") else "cpu"
+
         # Set up HuggingFace embeddings
-        model_kwargs = {"device": self.config.local_model_device}
+        model_kwargs = {"device": device}
         encode_kwargs = {"normalize_embeddings": True}
 
         self.embeddings = HuggingFaceEmbeddings(

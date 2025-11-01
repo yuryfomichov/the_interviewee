@@ -2,14 +2,20 @@
 
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Callable
 
+from langchain_core.retrievers import BaseRetriever
 from mlx_lm.generate import stream_generate
 from mlx_lm.utils import load as mlx_load
 
-from src.config import get_config
-from src.llm.base import LLMInterface
-from src.prompts import format_rag_prompt, get_system_prompt, get_system_prompt_for_qwen
+from src.llm.base import LLMInputs, LLMInterface
+from src.prompts import format_rag_prompt
+
+if TYPE_CHECKING:
+    import mlx.nn as nn
+    from mlx_lm.tokenizer_utils import TokenizerWrapper
+
+    from src.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +23,39 @@ logger = logging.getLogger(__name__)
 class MLXLocalLLM(LLMInterface):
     """Apple Silicon optimized LLM using MLX with LangChain integration."""
 
-    def __init__(self, config=None, retriever: Any = None, user_name: str = ""):
-        """Initialize MLX LLM using mlx_lm directly.
+    def __init__(self, system_prompt_fn: Callable[[str], str]):
+        """Initialize MLX LLM.
 
         Args:
-            config: Configuration instance (creates new if None)
+            system_prompt_fn: Function that takes user_name and returns system prompt
+
+        Call initialize() before using invoke() or stream().
+        """
+        self.system_prompt_fn = system_prompt_fn
+
+        # These will be set during initialize()
+        self.config: Config
+        self.model: nn.Module
+        self.tokenizer: TokenizerWrapper
+        self.retriever: BaseRetriever
+        self.system_prompt: str
+
+    def initialize(self, config, retriever: BaseRetriever, user_name: str) -> None:
+        """Initialize the LLM with config, retriever and user name.
+
+        Args:
+            config: Configuration instance
             retriever: Vector store retriever for RAG
             user_name: Name of the user/candidate
         """
-        self.config = config or get_config()
+        self.config = config
+        self.retriever = retriever
+        self.system_prompt = self.system_prompt_fn(user_name)
 
-        model_name = self.config.local_model_name
+        # Get model settings
+        self.settings = self.config.get_model_settings()
+
+        model_name = self.config.get_model_name()
         logger.info(f"Loading model with MLX: {model_name}")
         logger.info("Device: Apple Silicon (Metal)")
 
@@ -40,45 +68,17 @@ class MLXLocalLLM(LLMInterface):
             os.environ["HF_TOKEN"] = token
 
         try:
-            # Load model and tokenizer using mlx_lm directly (single load for both streaming and non-streaming)
+            # Load model and tokenizer using mlx_lm directly
             logger.info("Loading model with mlx_lm...")
             model_artifacts = mlx_load(model_name)
             # mlx_load can return 2 or 3 items (model, tokenizer, [config])
             self.model = model_artifacts[0]
             self.tokenizer = model_artifacts[1]
 
-            # Don't load a second copy via MLXPipeline - use mlx_lm directly for everything
-            self.mlx_pipeline = None
-
-            # Set retriever and system prompt
-            self.retriever = retriever
-            self.system_prompt = self.get_system_prompt(user_name) if user_name else ""
-
-            logger.info("Model loaded successfully")
+            logger.info("MLX model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
-
-    def get_system_prompt(self, user_name: str) -> str:
-        """Get the system prompt for MLX local models.
-
-        Automatically detects Qwen models and uses optimized prompt.
-
-        Args:
-            user_name: Name of the user/candidate
-
-        Returns:
-            System prompt string optimized for the specific model
-        """
-        model_name = self.config.local_model_name.lower()
-
-        # Use Qwen-specific prompt for Qwen models
-        if "qwen" in model_name:
-            logger.info("Using Qwen-optimized system prompt")
-            return get_system_prompt_for_qwen(user_name)
-
-        # Default prompt for other models
-        return get_system_prompt(user_name)
 
     def _format_docs(self, docs):
         """Format retrieved documents into context string."""
@@ -117,20 +117,12 @@ class MLXLocalLLM(LLMInterface):
             question=question,
         )
 
-    def invoke(self, inputs: dict) -> str:
-        """Non-streaming invocation.
-
-        Args:
-            inputs: Dictionary containing question and chat_history
-
-        Returns:
-            Generated response as a string
-        """
-        question = inputs.get("question", "")
-        chat_history = inputs.get("chat_history", [])
+    def invoke(self, inputs: LLMInputs) -> str:
+        question = inputs.question
+        chat_history = inputs.chat_history
 
         # Get context from retriever
-        docs = self.retriever.invoke(question) if self.retriever else []
+        docs = self.retriever.invoke(question)
         context = self._format_docs(docs)
 
         # Format prompt
@@ -143,25 +135,17 @@ class MLXLocalLLM(LLMInterface):
             model=self.model,
             tokenizer=self.tokenizer,
             prompt=full_prompt,
-            max_tokens=self.config.local_model_max_tokens,
+            max_tokens=self.settings.max_new_tokens,
             verbose=False,
         )
         return response
 
-    def stream(self, inputs: dict) -> Iterator[str]:
-        """Streaming invocation.
-
-        Args:
-            inputs: Dictionary containing question and chat_history
-
-        Yields:
-            Response tokens/chunks as strings
-        """
-        question = inputs.get("question", "")
-        chat_history = inputs.get("chat_history", [])
+    def stream(self, inputs: LLMInputs) -> Iterator[str]:
+        question = inputs.question
+        chat_history = inputs.chat_history
 
         # Get context from retriever
-        docs = self.retriever.invoke(question) if self.retriever else []
+        docs = self.retriever.invoke(question)
         context = self._format_docs(docs)
 
         # Format prompt
@@ -172,11 +156,11 @@ class MLXLocalLLM(LLMInterface):
             model=self.model,
             tokenizer=self.tokenizer,
             prompt=full_prompt,
-            max_tokens=self.config.local_model_max_tokens,
+            max_tokens=self.settings.max_new_tokens,
         ):
             # stream_generate yields GenerationResponse objects with a text attribute
             yield generation_response.text
 
     def __repr__(self) -> str:
         """String representation of the LLM."""
-        return f"MLXLocalLLM(model={self.config.local_model_name}, device=Apple Silicon)"
+        return f"MLXLocalLLM(model={self.config.get_model_name()}, device=Apple Silicon)"
