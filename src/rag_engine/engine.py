@@ -53,7 +53,6 @@ class RAGEngine:
             "confidential",
             "other candidates",
             "salary history",
-            "age",
             "marital status",
         ]
 

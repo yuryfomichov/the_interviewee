@@ -1,8 +1,8 @@
 """OpenAI API implementation."""
 
 import logging
-from collections.abc import Iterator
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.retrievers import BaseRetriever

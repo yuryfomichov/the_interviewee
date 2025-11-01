@@ -1,8 +1,8 @@
 """Apple Silicon optimized LLM using MLX."""
 
 import logging
-from collections.abc import Iterator
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 
 from langchain_core.retrievers import BaseRetriever
 from mlx_lm.generate import stream_generate
@@ -75,6 +75,21 @@ class MLXLocalLLM(LLMInterface):
             self.model = model_artifacts[0]
             self.tokenizer = model_artifacts[1]
 
+            # Ensure we have a chat template for instruct-tuned models
+            if (
+                hasattr(self.tokenizer, "default_chat_template")
+                and getattr(self.tokenizer, "chat_template", None) is None
+            ):
+                self.tokenizer.chat_template = self.tokenizer.default_chat_template
+            # Ensure tokenizer stops on modern special tokens
+            add_eos_token = getattr(self.tokenizer, "add_eos_token", None)
+            if callable(add_eos_token):
+                for eos_token in ("<|eot_id|>", "<|end_of_text|>", "</s>"):
+                    try:
+                        add_eos_token(eos_token)
+                    except Exception:
+                        continue
+
             logger.info("MLX model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
@@ -101,7 +116,43 @@ class MLXLocalLLM(LLMInterface):
 
     def _format_prompt(self, question: str, chat_history: list, context: str) -> str:
         """Format the full prompt with system prompt, context, history, and question."""
-        # Format chat history
+        if hasattr(self.tokenizer, "apply_chat_template") and getattr(
+            self.tokenizer, "chat_template", None
+        ):
+            system_sections = [self.system_prompt.strip()]
+            if context.strip():
+                system_sections.append("Use these career details to answer specifically:")
+                system_sections.append(context.strip())
+            if chat_history:
+                system_sections.append(
+                    "Conversation history follows for context only. Do not repeat its format."
+                )
+
+            messages: list[dict] = [{"role": "system", "content": "\n\n".join(system_sections)}]
+
+            for msg in chat_history or []:
+                content = msg.content if hasattr(msg, "content") else str(msg)
+                if not content:
+                    continue
+
+                role = getattr(msg, "role", None)
+                if role not in {"user", "assistant", "system"}:
+                    role = "assistant" if getattr(msg, "type", "") == "ai" else "user"
+
+                messages.append({"role": role, "content": content})
+
+            messages.append({"role": "user", "content": question.strip()})
+
+            try:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception as exc:
+                logger.warning(f"Falling back to text prompt due to chat template error: {exc}")
+
+        # Format chat history for text prompt fallback
         history_str = ""
         if chat_history:
             for msg in chat_history:
@@ -126,7 +177,7 @@ class MLXLocalLLM(LLMInterface):
         context = self._format_docs(docs)
 
         # Format prompt
-        full_prompt = self._format_prompt(question, chat_history, context)
+        prompt_input = self._format_prompt(question, chat_history, context)
 
         # Generate response (non-streaming) using mlx_lm directly
         from mlx_lm.generate import generate as mlx_generate
@@ -134,7 +185,7 @@ class MLXLocalLLM(LLMInterface):
         response = mlx_generate(
             model=self.model,
             tokenizer=self.tokenizer,
-            prompt=full_prompt,
+            prompt=prompt_input,
             max_tokens=self.settings.max_new_tokens,
             verbose=False,
         )
@@ -149,13 +200,13 @@ class MLXLocalLLM(LLMInterface):
         context = self._format_docs(docs)
 
         # Format prompt
-        full_prompt = self._format_prompt(question, chat_history, context)
+        prompt_input = self._format_prompt(question, chat_history, context)
 
         # Stream response using mlx_lm directly (MLXPipeline streaming is broken)
         for generation_response in stream_generate(
             model=self.model,
             tokenizer=self.tokenizer,
-            prompt=full_prompt,
+            prompt=prompt_input,
             max_tokens=self.settings.max_new_tokens,
         ):
             # stream_generate yields GenerationResponse objects with a text attribute

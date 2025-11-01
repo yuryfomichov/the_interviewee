@@ -5,7 +5,7 @@ import platform
 
 from src.config import get_config
 from src.llm.base import LLMInterface
-from src.prompts import get_default_system_prompt, get_system_prompt_for_qwen
+from src.prompts import get_default_system_prompt
 
 # Detect if we're on Apple Silicon
 IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm64"
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 PROVIDER_CONFIG = {
     "qwen": {
         "backend": "mlx",
-        "system_prompt_fn": get_system_prompt_for_qwen,
+        "system_prompt_fn": get_default_system_prompt,
     },
     "llama": {
         "backend": "mlx",
