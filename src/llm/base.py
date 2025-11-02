@@ -1,7 +1,7 @@
 """Base interface for LLM implementations."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING
 
 from langchain_core.messages import BaseMessage
@@ -30,18 +30,27 @@ class LLMInterface(ABC):
     LLM implementations must support RAG-based invoke and stream methods.
     """
 
-    @abstractmethod
-    def initialize(self, config: "Config", retriever: "BaseRetriever", user_name: str) -> None:
-        """Initialize the LLM with config, retriever and user name.
+    config: "Config"
+    retriever: "BaseRetriever"
+    user_name: str
+    last_prompt: str | None
+    system_prompt_fn: Callable[[str], str]
+    system_prompt: str
 
-        Must be called before invoke() or stream().
-
-        Args:
-            config: Configuration instance
-            retriever: Vector store retriever for RAG
-            user_name: Name of the user/candidate
-        """
-        pass
+    def __init__(
+        self,
+        config: "Config",
+        retriever: "BaseRetriever",
+        user_name: str,
+        system_prompt_fn: Callable[[str], str],
+    ) -> None:
+        """Common initialization for concrete LLMs."""
+        self.config = config
+        self.retriever = retriever
+        self.user_name = user_name
+        self.last_prompt = None
+        self.system_prompt_fn = system_prompt_fn
+        self.system_prompt = system_prompt_fn(user_name)
 
     @abstractmethod
     def invoke(self, inputs: LLMInputs) -> str:

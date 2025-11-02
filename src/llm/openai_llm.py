@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.retrievers import BaseRetriever
@@ -13,47 +13,41 @@ from src.llm.base import LLMInputs, LLMInterface
 if TYPE_CHECKING:
     from src.config import Config
 
+from src.config import OpenAIModelSettings
+
 logger = logging.getLogger(__name__)
 
 
 class OpenAILLM(LLMInterface):
     """OpenAI API implementation."""
 
-    def __init__(self, system_prompt_fn: Callable[[str], str]):
-        """Initialize OpenAI LLM.
+    llm: ChatOpenAI
+    prompt_template: ChatPromptTemplate
+    settings: OpenAIModelSettings
 
-        Args:
-            system_prompt_fn: Function that takes user_name and returns system prompt
-
-        Call initialize() before using invoke() or stream().
-        """
-        self.system_prompt_fn = system_prompt_fn
-
-        # These will be set during initialize()
-        self.config: Config
-        self.llm: ChatOpenAI
-        self.retriever: BaseRetriever
-        self.system_prompt: str
-        self.prompt_template: ChatPromptTemplate
-
-    def initialize(self, config, retriever: BaseRetriever, user_name: str) -> None:
-        """Initialize the LLM with config, retriever and user name.
-
-        Args:
-            config: Configuration instance
-            retriever: Vector store retriever for RAG
-            user_name: Name of the user/candidate
-        """
-        self.config = config
+    def __init__(
+        self,
+        config: "Config",
+        retriever: BaseRetriever,
+        user_name: str,
+        system_prompt_fn: Callable[[str], str],
+    ):
+        """Instantiate the OpenAI-backed LLM with all required dependencies."""
+        super().__init__(
+            config=config,
+            retriever=retriever,
+            user_name=user_name,
+            system_prompt_fn=system_prompt_fn,
+        )
 
         if not self.config.openai_api_key:
             raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
 
-        self.retriever = retriever
-        self.system_prompt = self.system_prompt_fn(user_name)
-
         # Get model settings
-        self.settings = self.config.get_model_settings()
+        settings = self.config.get_model_settings()
+        if not isinstance(settings, OpenAIModelSettings):
+            raise TypeError("OpenAILLM requires OpenAI model settings.")
+        self.settings = cast(OpenAIModelSettings, settings)
 
         # Get model name from config
         model_name = self.config.get_model_name()
@@ -100,6 +94,15 @@ Context from your career:
                 context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
         return "\n".join(context_parts)
 
+    def _serialize_messages(self, messages) -> str:
+        """Serialize LangChain messages for logging."""
+        serialized = []
+        for msg in messages:
+            role = getattr(msg, "type", getattr(msg, "role", ""))
+            content = msg.content if hasattr(msg, "content") else str(msg)
+            serialized.append(f"{role.upper()}: {content}")
+        return "\n".join(serialized)
+
     def invoke(self, inputs: LLMInputs) -> str:
         question = inputs.question
         chat_history = inputs.chat_history
@@ -114,6 +117,7 @@ Context from your career:
             chat_history=chat_history,
             question=question,
         )
+        self.last_prompt = self._serialize_messages(messages)
 
         # Generate response (non-streaming)
         response = self.llm.invoke(messages)
@@ -146,6 +150,7 @@ Context from your career:
                 yield content
             elif content:
                 yield str(content)
+        self.last_prompt = self._serialize_messages(messages)
 
     def __repr__(self) -> str:
         """String representation of the LLM."""

@@ -11,6 +11,14 @@
     "${workspaceFolder}",
     "${workspaceFolder}/src"
   ],
+  "python.analysis.exclude": [
+    "**/.venv",
+    "**/htmlcov",
+    "**/prompts",
+    "**/career_data",
+    "**/vector_db",
+    "**/models"
+  ],
   "python.analysis.diagnosticSeverityOverrides": {
     "reportMissingImports": "warning"
   },
@@ -64,15 +72,25 @@
     "**/*.pyc": true,
     ".pytest_cache": true,
     "**/.mypy_cache": true,
-    "**/node_modules": true
+    "**/node_modules": true,
+    "**/htmlcov": true,
+    "**/career_data": true,
+    "**/vector_db": true,
+    "**/models": true
   },
   "files.watcherExclude": {
     "**/__pycache__/**": true,
+    "**/.venv/**": true,
+    "**/htmlcov/**": true,
+    "**/career_data/**": true,
+    "**/prompts/**": true,
     "**/models/**": true,
     "**/vector_db/**": true
   },
   "search.exclude": {
     "**/models": true,
-    "**/vector_db": true
+    "**/vector_db": true,
+    "**/htmlcov": true,
+    "**/career_data": true
   }
 }

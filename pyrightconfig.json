@@ -6,6 +6,9 @@
   "exclude": [
     "**/__pycache__",
     ".venv",
+    "htmlcov",
+    "prompts",
+    "career_data",
     "vector_db",
     "models"
   ],

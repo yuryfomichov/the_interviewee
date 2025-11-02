@@ -26,13 +26,12 @@ def create_rag_engine(config: Config | None = None) -> RAGEngine:
     document_loader = create_document_loader(config)
     document_loader.initialize()
 
-    # Create LLM
-    llm = create_llm()
+    retriever = document_loader.get_retriever()
 
-    # Initialize LLM with config, retriever and user name
-    llm.initialize(
+    # Create fully initialized LLM
+    llm = create_llm(
+        retriever=retriever,
         config=config,
-        retriever=document_loader.get_retriever(),
         user_name=config.user_name,
     )
 

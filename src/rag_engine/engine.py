@@ -8,6 +8,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from src.config import Config, get_config
 from src.llm.base import LLMInputs, LLMInterface
 from src.prompts import OUT_OF_SCOPE_RESPONSE
+from src.rag_engine.prompt_logger import PromptLogger
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class RAGEngine:
 
         # Create conversational memory
         self.memory = ChatMessageHistory()
+        self.prompt_logger = PromptLogger()
 
         logger.info(f"RAG engine initialized with LLM: {type(llm).__name__}")
 
@@ -116,6 +118,7 @@ class RAGEngine:
 
             self.memory.add_message(HumanMessage(content=question))
             self.memory.add_message(AIMessage(content=full_response))
+            self.prompt_logger.log(question, self.llm.last_prompt, full_response)
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")

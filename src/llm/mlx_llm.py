@@ -2,20 +2,21 @@
 
 import logging
 from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+import mlx.nn as nn
 from langchain_core.retrievers import BaseRetriever
 from mlx_lm.generate import stream_generate
+from mlx_lm.tokenizer_utils import TokenizerWrapper
 from mlx_lm.utils import load as mlx_load
 
 from src.llm.base import LLMInputs, LLMInterface
 from src.prompts import format_rag_prompt
 
 if TYPE_CHECKING:
-    import mlx.nn as nn
-    from mlx_lm.tokenizer_utils import TokenizerWrapper
-
     from src.config import Config
+
+from src.config import MLXModelSettings
 
 logger = logging.getLogger(__name__)
 
@@ -23,37 +24,30 @@ logger = logging.getLogger(__name__)
 class MLXLocalLLM(LLMInterface):
     """Apple Silicon optimized LLM using MLX with LangChain integration."""
 
-    def __init__(self, system_prompt_fn: Callable[[str], str]):
-        """Initialize MLX LLM.
+    model: nn.Module
+    tokenizer: TokenizerWrapper
+    settings: MLXModelSettings
 
-        Args:
-            system_prompt_fn: Function that takes user_name and returns system prompt
-
-        Call initialize() before using invoke() or stream().
-        """
-        self.system_prompt_fn = system_prompt_fn
-
-        # These will be set during initialize()
-        self.config: Config
-        self.model: nn.Module
-        self.tokenizer: TokenizerWrapper
-        self.retriever: BaseRetriever
-        self.system_prompt: str
-
-    def initialize(self, config, retriever: BaseRetriever, user_name: str) -> None:
-        """Initialize the LLM with config, retriever and user name.
-
-        Args:
-            config: Configuration instance
-            retriever: Vector store retriever for RAG
-            user_name: Name of the user/candidate
-        """
-        self.config = config
-        self.retriever = retriever
-        self.system_prompt = self.system_prompt_fn(user_name)
+    def __init__(
+        self,
+        config: "Config",
+        retriever: BaseRetriever,
+        user_name: str,
+        system_prompt_fn: Callable[[str], str],
+    ):
+        """Instantiate the MLX-backed LLM with all required dependencies."""
+        super().__init__(
+            config=config,
+            retriever=retriever,
+            user_name=user_name,
+            system_prompt_fn=system_prompt_fn,
+        )
 
         # Get model settings
-        self.settings = self.config.get_model_settings()
+        model_settings = self.config.get_model_settings()
+        if not isinstance(model_settings, MLXModelSettings):
+            raise TypeError("MLXLocalLLM requires MLX model settings.")
+        self.settings = cast(MLXModelSettings, model_settings)
 
         model_name = self.config.get_model_name()
         logger.info(f"Loading model with MLX: {model_name}")
@@ -114,45 +108,48 @@ class MLXLocalLLM(LLMInterface):
                 context_parts.append(f"[Source {i}: {source_name}]\n{page_content}\n")
         return "\n".join(context_parts)
 
-    def _format_prompt(self, question: str, chat_history: list, context: str) -> str:
-        """Format the full prompt with system prompt, context, history, and question."""
-        if hasattr(self.tokenizer, "apply_chat_template") and getattr(
-            self.tokenizer, "chat_template", None
-        ):
-            system_sections = [self.system_prompt.strip()]
-            if context.strip():
-                system_sections.append("Use these career details to answer specifically:")
-                system_sections.append(context.strip())
-            if chat_history:
-                system_sections.append(
-                    "Conversation history follows for context only. Do not repeat its format."
-                )
+    def _normalize_history(self, chat_history: list) -> list[dict]:
+        """Convert LangChain chat messages into tokenizer-compatible dicts."""
+        normalized: list[dict] = []
+        for msg in chat_history or []:
+            content = msg.content if hasattr(msg, "content") else str(msg)
+            if not content:
+                continue
 
-            messages: list[dict] = [{"role": "system", "content": "\n\n".join(system_sections)}]
+            role = getattr(msg, "role", None)
+            if role not in {"user", "assistant", "system"}:
+                role = "assistant" if getattr(msg, "type", "") == "ai" else "user"
+            normalized.append({"role": role, "content": content})
+        return normalized
 
-            for msg in chat_history or []:
-                content = msg.content if hasattr(msg, "content") else str(msg)
-                if not content:
-                    continue
+    def _build_chat_prompt(self, question: str, context: str, chat_history: list) -> str:
+        """Build prompt using tokenizer chat template."""
+        system_sections = [self.system_prompt.strip()]
+        if context.strip():
+            system_sections.append("Use these career details to answer specifically:")
+            system_sections.append(context.strip())
+        if chat_history:
+            system_sections.append(
+                "Conversation history follows for context only. Do not repeat its format."
+            )
 
-                role = getattr(msg, "role", None)
-                if role not in {"user", "assistant", "system"}:
-                    role = "assistant" if getattr(msg, "type", "") == "ai" else "user"
+        messages: list[dict] = [{"role": "system", "content": "\n\n".join(system_sections)}]
+        messages.extend(self._normalize_history(chat_history))
+        messages.append({"role": "user", "content": question.strip()})
 
-                messages.append({"role": role, "content": content})
+        template_fn = getattr(self.tokenizer, "apply_chat_template", None)
+        if not callable(template_fn):
+            raise AttributeError("Tokenizer does not support chat templates.")
 
-            messages.append({"role": "user", "content": question.strip()})
+        prompt = template_fn(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        return cast(str, prompt)
 
-            try:
-                return self.tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                    add_generation_prompt=True,
-                )
-            except Exception as exc:
-                logger.warning(f"Falling back to text prompt due to chat template error: {exc}")
-
-        # Format chat history for text prompt fallback
+    def _build_text_prompt(self, question: str, context: str, chat_history: list) -> str:
+        """Fallback prompt builder using plain text template."""
         history_str = ""
         if chat_history:
             for msg in chat_history:
@@ -160,7 +157,6 @@ class MLXLocalLLM(LLMInterface):
                 content = msg.content if hasattr(msg, "content") else str(msg)
                 history_str += f"{role}: {content}\n"
 
-        # Use the format_rag_prompt function from prompts module
         return format_rag_prompt(
             system_prompt=self.system_prompt,
             context=context,
@@ -168,16 +164,31 @@ class MLXLocalLLM(LLMInterface):
             question=question,
         )
 
-    def invoke(self, inputs: LLMInputs) -> str:
+    def _build_prompt(self, inputs: LLMInputs) -> str:
+        """Build prompt string, preferring chat templates when available."""
         question = inputs.question
         chat_history = inputs.chat_history
 
-        # Get context from retriever
         docs = self.retriever.invoke(question)
         context = self._format_docs(docs)
 
-        # Format prompt
-        prompt_input = self._format_prompt(question, chat_history, context)
+        prompt: str | None = None
+        template_fn = getattr(self.tokenizer, "apply_chat_template", None)
+        has_template = bool(getattr(self.tokenizer, "chat_template", None))
+        if callable(template_fn) and has_template:
+            try:
+                prompt = self._build_chat_prompt(question, context, chat_history)
+            except Exception as exc:
+                logger.warning(f"Falling back to text prompt due to chat template error: {exc}")
+
+        if prompt is None:
+            prompt = self._build_text_prompt(question, context, chat_history)
+
+        self.last_prompt = prompt
+        return prompt
+
+    def invoke(self, inputs: LLMInputs) -> str:
+        prompt_input = self._build_prompt(inputs)
 
         # Generate response (non-streaming) using mlx_lm directly
         from mlx_lm.generate import generate as mlx_generate
@@ -192,15 +203,7 @@ class MLXLocalLLM(LLMInterface):
         return response
 
     def stream(self, inputs: LLMInputs) -> Iterator[str]:
-        question = inputs.question
-        chat_history = inputs.chat_history
-
-        # Get context from retriever
-        docs = self.retriever.invoke(question)
-        context = self._format_docs(docs)
-
-        # Format prompt
-        prompt_input = self._format_prompt(question, chat_history, context)
+        prompt_input = self._build_prompt(inputs)
 
         # Stream response using mlx_lm directly (MLXPipeline streaming is broken)
         for generation_response in stream_generate(

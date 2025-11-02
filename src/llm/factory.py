@@ -2,10 +2,21 @@
 
 import logging
 import platform
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Literal, TypedDict
 
-from src.config import get_config
+from src.config import Config, get_config
 from src.llm.base import LLMInterface
 from src.prompts import get_default_system_prompt
+
+if TYPE_CHECKING:
+    from langchain_core.retrievers import BaseRetriever
+
+
+class ProviderConfig(TypedDict):
+    backend: Literal["mlx", "openai"]
+    system_prompt_fn: Callable[[str], str]
+
 
 # Detect if we're on Apple Silicon
 IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm64"
@@ -24,7 +35,7 @@ if IS_APPLE_SILICON:
 logger = logging.getLogger(__name__)
 
 # Provider configuration mapping
-PROVIDER_CONFIG = {
+PROVIDER_CONFIG: dict[str, ProviderConfig] = {
     "qwen": {
         "backend": "mlx",
         "system_prompt_fn": get_default_system_prompt,
@@ -40,13 +51,18 @@ PROVIDER_CONFIG = {
 }
 
 
-def create_llm() -> LLMInterface:
-    """Factory function to create appropriate LLM based on platform.
+def create_llm(
+    *,
+    retriever: "BaseRetriever",
+    config: Config | None = None,
+    user_name: str | None = None,
+) -> LLMInterface:
+    """Create and fully initialize the appropriate LLM based on the current platform."""
+    if retriever is None:
+        raise ValueError("retriever must be provided to create an LLM instance.")
 
-    Returns:
-        Uninitialized LLM interface instance (call initialize() before use)
-    """
-    config = get_config()
+    config = config or get_config()
+    user_name = user_name or config.user_name
     provider = config.model_provider.lower()
 
     # Check if provider is valid
@@ -64,7 +80,12 @@ def create_llm() -> LLMInterface:
             logger.info(f"Creating {provider} LLM with MLX (Apple Silicon optimized)")
             from src.llm.mlx_llm import MLXLocalLLM
 
-            return MLXLocalLLM(system_prompt_fn=system_prompt_fn)
+            return MLXLocalLLM(
+                config=config,
+                retriever=retriever,
+                user_name=user_name,
+                system_prompt_fn=system_prompt_fn,
+            )
         else:
             raise ImportError(
                 f"{provider} models require MLX on Apple Silicon. Install with: pip install mlx mlx-lm"
@@ -73,6 +94,11 @@ def create_llm() -> LLMInterface:
         logger.info("Creating OpenAI LLM")
         from src.llm.openai_llm import OpenAILLM
 
-        return OpenAILLM(system_prompt_fn=system_prompt_fn)
+        return OpenAILLM(
+            config=config,
+            retriever=retriever,
+            user_name=user_name,
+            system_prompt_fn=system_prompt_fn,
+        )
     else:
         raise ValueError(f"Unknown backend: {backend}")
