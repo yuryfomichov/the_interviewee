@@ -4,11 +4,11 @@ An AI-powered interview practice assistant using RAG (Retrieval-Augmented Genera
 
 ## Features
 
-- **MLX & OpenAI Support**: Local models on Apple Silicon (MLX) or OpenAI API
+- **Multiple LLM Providers**: Qwen/Llama (MLX on Apple Silicon) or OpenAI API
+- **Flexible UI**: Web interface (Gradio) or CLI mode
 - **RAG Architecture**: Retrieves relevant information from your career documents
-- **Interactive Chat**: Clean Gradio web interface for interview practice
-- **STAR Method Responses**: Generates answers using Situation, Task, Action, Result format
-- **Source Citations**: Shows which documents were used to generate responses
+- **STAR Method Responses**: Generates structured answers (Situation, Task, Action, Result)
+- **Session Logging**: Tracks questions, prompts, and responses for review
 
 ## Quick Start
 
@@ -65,14 +65,13 @@ Edit `.env`:
 # User Configuration
 USER_NAME=YourName
 
-# Model Configuration
-MODEL_PROVIDER=local  # or 'openai'
+# Model Provider (qwen, llama, or openai)
+MODEL_PROVIDER=qwen
 
-# For MLX (Apple Silicon)
-LOCAL_MODEL_NAME=mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit
-DEVICE=mps
+# Launcher Type (gradio or cli)
+LAUNCHER_TYPE=gradio
 
-# For OpenAI (optional)
+# For OpenAI (if using OpenAI provider)
 OPENAI_API_KEY=your_api_key_here
 
 # Paths
@@ -85,53 +84,52 @@ VECTOR_DB_PATH=./vector_db
 Index your career documents:
 
 ```bash
-python src/document_loader.py --rebuild
+python -m src.document_loader.huggingface_loader --rebuild
 ```
 
 ### 5. Run Application
 
 ```bash
-python src/app.py
+python -m src.app
 ```
 
-Visit: http://localhost:7860
+Visit: http://localhost:7860 (or use CLI mode with `LAUNCHER_TYPE=cli`)
 
 ## Configuration
 
 ### Model Selection
 
-#### Local Models (MLX - Apple Silicon Only)
+The project supports three model providers configured via `MODEL_PROVIDER` in `.env`:
 
-Edit `config.yaml`:
-
-```yaml
-model:
-  local:
-    model_name: "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit"
-    device: "mps"
-    max_new_tokens: 512
-    temperature: 0.7
+#### Qwen (Default - MLX, Apple Silicon Only)
+```bash
+MODEL_PROVIDER=qwen
 ```
+Uses `mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit` - Excellent quality
 
-**Recommended models:**
-- `mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit` - Excellent quality
-- `mlx-community/Meta-Llama-3.1-8B-Instruct-4bit` - Fast, good quality
+#### Llama (MLX, Apple Silicon Only)
+```bash
+MODEL_PROVIDER=llama
+```
+Uses `mlx-community/Meta-Llama-3-8B-Instruct-4bit` - Fast, good quality
 
 #### OpenAI API
-
-Edit `config.yaml`:
-
-```yaml
-model:
-  openai:
-    model_name: "gpt-4o-mini"
-    max_tokens: 1024
-    temperature: 0.7
-```
-
-Set API key in `.env`:
 ```bash
+MODEL_PROVIDER=openai
 OPENAI_API_KEY=your_key_here
+```
+Uses `gpt-4o-mini` by default
+
+**Note**: MLX models require macOS with Apple Silicon (M1/M2/M3/M4). For other platforms, use OpenAI.
+
+### Launcher Selection
+
+Choose between web UI or CLI:
+
+```bash
+LAUNCHER_TYPE=gradio  # Web interface (default)
+# or
+LAUNCHER_TYPE=cli     # Terminal interface
 ```
 
 ### RAG Parameters
@@ -152,19 +150,29 @@ rag:
 ```
 interviewee/
 ├── src/
-│   ├── config.py           # Configuration management
-│   ├── document_loader.py  # Document loading and vector DB
-│   ├── llm/                # LLM abstraction layer
-│   │   ├── base.py         # Abstract LLM interface
-│   │   ├── mlx_llm.py      # Apple Silicon MLX backend
-│   │   ├── openai_llm.py   # OpenAI API backend
-│   │   └── factory.py      # LLM factory function
-│   ├── rag_engine.py       # RAG implementation
-│   └── app.py              # Gradio web interface
-├── tests/                  # Test files
-├── career_data/            # Your career markdown files (gitignored)
-├── vector_db/              # ChromaDB storage
-└── config.yaml             # Configuration file
+│   ├── app.py                      # Application entry point
+│   ├── config.py                   # Configuration singleton
+│   ├── prompts.py                  # Prompt templates
+│   ├── launchers/                  # UI abstraction layer
+│   │   ├── gradio_launcher.py      # Web interface
+│   │   ├── cli_launcher.py         # Terminal interface
+│   │   └── factory.py              # Launcher factory
+│   ├── llm/                        # LLM backends
+│   │   ├── base.py                 # Abstract LLM interface
+│   │   ├── mlx_llm.py              # MLX (Apple Silicon)
+│   │   ├── openai_llm.py           # OpenAI API
+│   │   └── factory.py              # LLM factory
+│   ├── rag_engine/                 # RAG orchestration
+│   │   ├── engine.py               # Main RAG logic
+│   │   ├── prompt_logger.py        # Session logging
+│   │   └── factory.py              # RAG factory
+│   └── document_loader/            # Vector store management
+│       ├── huggingface_loader.py   # Document loading
+│       └── factory.py              # Loader factory
+├── tests/                          # Test suite
+├── career_data/                    # Your markdown files (gitignored)
+├── vector_db/                      # ChromaDB storage (gitignored)
+└── config.yaml                     # Main configuration
 ```
 
 ## Development
@@ -214,7 +222,7 @@ pytest -v
 ```bash
 # Delete and rebuild
 rm -rf vector_db/
-python src/document_loader.py --rebuild
+python -m src.document_loader.huggingface_loader --rebuild
 ```
 
 ## System Requirements

@@ -50,6 +50,7 @@ models/
 .env
 .claude/
 .github/
+CLAUDE.md
 .clinerules
 task.md
 .devcontainer/
