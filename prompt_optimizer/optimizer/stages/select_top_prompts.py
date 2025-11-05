@@ -1,0 +1,58 @@
+"""Select top prompts stage: Filter best performing candidates."""
+
+from prompt_optimizer.optimizer.base_stage import BaseStage
+from prompt_optimizer.optimizer.context import RunContext
+
+
+class SelectTopPromptsStage(BaseStage):
+    """Select top N performing prompts."""
+
+    def __init__(self, top_n: int, selection_type: str, *args, **kwargs):
+        """
+        Initialize selection stage.
+
+        Args:
+            top_n: Number of top prompts to select
+            selection_type: "quick" or "rigorous" to determine which field to update
+            *args, **kwargs: Passed to BaseStage
+        """
+        super().__init__(*args, **kwargs)
+        self.top_n = top_n
+        self.selection_type = selection_type
+
+    @property
+    def name(self) -> str:
+        """Return the stage name."""
+        return f"Select Top {self.top_n}"
+
+    async def run(self, context: RunContext) -> RunContext:
+        """
+        Select top N prompts by score.
+
+        Args:
+            context: Run context with prompts
+
+        Returns:
+            Updated context with top_k_prompts or top_m_prompts populated
+        """
+        # Determine which prompts to select from
+        if self.selection_type == "quick":
+            prompts = context.initial_prompts.copy()
+        else:  # rigorous
+            prompts = context.top_k_prompts.copy()
+
+        prompts.sort(key=lambda p: p.average_score or 0, reverse=True)
+        top_prompts = prompts[: self.top_n]
+
+        self._print_progress(
+            f"\nTop {self.top_n} prompts selected "
+            f"(scores: {[f'{p.average_score:.2f}' for p in top_prompts]})"
+        )
+
+        # Update context
+        if self.selection_type == "quick":
+            context.top_k_prompts = top_prompts
+        else:  # rigorous
+            context.top_m_prompts = top_prompts
+
+        return context

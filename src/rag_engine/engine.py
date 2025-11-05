@@ -68,7 +68,11 @@ class RAGEngine:
         return False
 
     def generate_response(
-        self, question: str, use_history: bool = True, stream: bool = False
+        self,
+        question: str,
+        use_history: bool = True,
+        stream: bool = False,
+        system_prompt_override: str | None = None,
     ) -> Iterator[str]:
         """Generate response to interview question.
 
@@ -76,6 +80,8 @@ class RAGEngine:
             question: User question
             use_history: Whether to consider conversation history
             stream: Whether to stream the response
+            system_prompt_override: Optional system prompt to use instead of default
+                                   (useful for testing/optimizing prompts)
 
         Yields:
             Response tokens
@@ -88,6 +94,13 @@ class RAGEngine:
             return
 
         try:
+            # Temporarily override system prompt if provided
+            original_prompt = None
+            if system_prompt_override:
+                original_prompt = self.llm.system_prompt
+                self.llm.system_prompt = system_prompt_override
+                logger.debug("Using overridden system prompt for this request")
+
             # Get chat history if needed
             chat_history = self.memory.messages if use_history else []
 
@@ -127,6 +140,11 @@ class RAGEngine:
                 "Please try again or rephrase your question."
             )
             yield error_msg
+        finally:
+            # Restore original system prompt if it was overridden
+            if system_prompt_override and original_prompt:
+                self.llm.system_prompt = original_prompt
+                logger.debug("Restored original system prompt")
 
     def clear_history(self) -> None:
         """Clear conversation history."""
