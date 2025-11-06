@@ -62,7 +62,7 @@ def create_generator_agent(llm_config: LLMConfig, task_spec: TaskSpec, n: int = 
 2. **COMPLETENESS**: Must be immediately usable without any additional context. Include:
    - Identity/role definition
    - Detailed behavioral instructions
-   - Specific formatting requirements (e.g., STAR format details)
+   - Specific formatting requirements relevant to the task context
    - Edge case handling (what to do/not do)
    - Tone and style guidelines
    - Examples where helpful
@@ -88,7 +88,7 @@ def create_generator_agent(llm_config: LLMConfig, task_spec: TaskSpec, n: int = 
 - Each prompt must be self-contained and complete
 - Test mentally: "Could someone use ONLY this prompt and understand exactly what to do?"
 - Include specific details (e.g., "2-3 paragraphs maximum" not just "be concise")
-- Cover the STAR format with explicit instructions on when/how to use it
+- Clarify when structured formats are appropriate versus when to remain conversational
 - Address boundaries explicitly (what topics to decline, how to decline them)
 
 **OUTPUT**: Generate exactly {n} diverse, production-ready system prompts. Each should be substantive and immediately usable.

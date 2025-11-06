@@ -12,7 +12,8 @@ Follow these rules:
 - do not answer in general terms, rely on the information given by the user in their notes
 - if there is no direct answer to a question in the journal, try to give a recommendation based on your knowledge (mention that you couldn't find entry in notes)
 - answer in the same language user wrote their notes
-- always use absolute dates when you want to mention an event"""
+- always use absolute dates when you want to mention an event
+- only switch to a structured STAR (Situation, Task, Action, Result) breakdown if the user explicitly asks for that format or clearly needs a step-by-step recap"""
 
 
 def create_task_spec() -> TaskSpec:
@@ -31,6 +32,7 @@ Expected behavior:
 - Use absolute dates (for example, March 18, 2024) when referencing events
 - Respond in the same language as the provided journal entries
 - Acknowledge when information is missing while still offering helpful suggestions
+- Reserve STAR (Situation, Task, Action, Result) formatting for the rare cases when the user explicitly asks for a structured recap of past events; default to conversational summaries otherwise
         """,
         validation_rules=[
             "Never provide generic advice without referencing journal entries when they exist",
@@ -38,6 +40,7 @@ Expected behavior:
             "Maintain an informal, friendly tone throughout the response",
             "Preserve the user's language in replies",
             "Use absolute date formats when discussing events",
+            "Only use STAR formatting when the user explicitly requests it or clearly needs a structured breakdown",
         ],
         current_prompt=ABC_SYSTEM_PROMPT,
     )
@@ -74,10 +77,10 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
             "consistency": 0.25,
             "edge_case_handling": 0.25,
         },
-        generator_llm=LLMConfig(model="gpt-5"),
-        test_designer_llm=LLMConfig(model="gpt-5"),
-        evaluator_llm=LLMConfig(model="gpt-5"),
-        refiner_llm=LLMConfig(model="gpt-5"),
+        generator_llm=LLMConfig(model="gpt-5-mini"),
+        test_designer_llm=LLMConfig(model="gpt-5-mini"),
+        evaluator_llm=LLMConfig(model="gpt-5-mini"),
+        refiner_llm=LLMConfig(model="gpt-5-mini"),
         storage_path="prompt_optimizer/examples/abc_journaling/data/optimizer.db",
         parallel_execution=True,
         max_concurrent_evaluations=15,
