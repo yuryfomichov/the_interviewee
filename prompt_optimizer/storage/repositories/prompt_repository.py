@@ -111,7 +111,7 @@ class PromptRepository:
         """
         return (
             self.session.query(Prompt)
-            .filter(Prompt.run_id == run_id, Prompt.is_original_system_prompt == True)
+            .filter(Prompt.run_id == run_id, Prompt.is_original_system_prompt.is_(True))
             .first()
         )
 

@@ -9,8 +9,8 @@ from prompt_optimizer.agents.refiner_agent import RefinedPromptOutput, create_re
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
+from prompt_optimizer.schemas import PromptCandidate, WeaknessAnalysis
 from prompt_optimizer.storage import PromptConverter, TestCaseConverter, WeaknessAnalysisConverter
-from prompt_optimizer.types import PromptCandidate, WeaknessAnalysis
 
 
 class RefinementStage(BaseStage):
@@ -78,7 +78,15 @@ class RefinementStage(BaseStage):
         track_id: int,
         semaphore: asyncio.Semaphore | None = None,
     ) -> None:
-        """Run a single refinement track with iterative improvements."""
+        """
+        Run a single refinement track with iterative improvements.
+
+        Args:
+            initial_prompt: Starting prompt for refinement
+            context: Run context with database access
+            track_id: Track identifier
+            semaphore: Optional semaphore for controlling concurrency
+        """
         # Query rigorous tests from database
         db_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
         rigorous_tests = [TestCaseConverter.from_db(t) for t in db_tests]
@@ -89,57 +97,41 @@ class RefinementStage(BaseStage):
         db_initial = PromptConverter.to_db(initial_prompt, context.run_id)
         context.prompt_repo.save(db_initial)
 
+        # Initialize tracking variables
         current_prompt = initial_prompt
         best_score = current_prompt.average_score or 0
-
         no_improvement_count = 0
+        parent_prompt_id = initial_prompt.id
 
         self._print_progress(f"\n  Track {track_id}: Starting (score={best_score:.2f})")
 
-        parent_prompt_id = initial_prompt.id
-
+        # Refinement loop
         for iteration in range(1, self.config.max_iterations_per_track + 1):
             # Analyze weaknesses
             weaknesses = await self._analyze_weaknesses(current_prompt, context)
-            failed_tests = weaknesses.get("failed_tests", [])
-            failed_test_ids = weaknesses.get("failed_test_ids", [])
-            weakness_description = weaknesses.get("description", "")
 
             # Store weakness analysis in database
             weakness_analysis = WeaknessAnalysis(
-                iteration=iteration - 1,  # The iteration where this weakness was found
-                description=weakness_description,
-                failed_test_ids=failed_test_ids,
-                failed_test_descriptions=failed_tests,
+                iteration=iteration - 1,
+                description=weaknesses["description"],
+                failed_test_ids=weaknesses["failed_test_ids"],
+                failed_test_descriptions=weaknesses["failed_tests"],
             )
-            db_weakness = WeaknessAnalysisConverter.to_db(weakness_analysis, current_prompt.id)
-            context._session.add(db_weakness)
-            context._session.commit()
+            self._save_weakness_analysis(context, weakness_analysis, current_prompt.id)
 
-            # Generate refinement
-            refiner = create_refiner_agent(
-                self.config.refiner_llm,
+            # Generate refined prompt
+            refined_text = await self._generate_refinement(
+                context,
                 task_spec,
                 current_prompt.prompt_text,
-                weakness_description,
-                failed_tests,
+                weaknesses["description"],
+                weaknesses["failed_tests"],
+                track_id,
                 iteration,
             )
-            refinement_result = await Runner.run(
-                refiner, f"Refine prompt (track {track_id}, iteration {iteration})"
-            )
-            refined_text = self._parse_refined_prompt(refinement_result.final_output)
 
-            # Create new candidate
-            refined_prompt = PromptCandidate(
-                id=f"track{track_id}_iter{iteration}_{uuid.uuid4().hex[:8]}",
-                prompt_text=refined_text,
-                stage="refined",
-                iteration=iteration,
-                track_id=track_id,
-            )
-
-            # Re-evaluate
+            # Create and evaluate refined prompt
+            refined_prompt = self._create_refined_prompt(track_id, iteration, refined_text)
             new_score = await evaluate_prompt(
                 refined_prompt,
                 rigorous_tests,
@@ -152,15 +144,13 @@ class RefinementStage(BaseStage):
             )
             refined_prompt.average_score = new_score
 
-            # Save to database with parent linkage
-            db_refined = PromptConverter.to_db(refined_prompt, context.run_id)
-            db_refined.parent_prompt_id = parent_prompt_id
-            context.prompt_repo.save(db_refined)
+            # Save refined prompt to database
+            self._save_refined_prompt(context, refined_prompt, parent_prompt_id)
 
             # Check for improvement
             improvement = (new_score - best_score) / best_score if best_score > 0 else 0
 
-            if improvement >= self.config.convergence_threshold:
+            if self._check_improvement(improvement):
                 current_prompt = refined_prompt
                 parent_prompt_id = refined_prompt.id
                 best_score = new_score
@@ -180,6 +170,7 @@ class RefinementStage(BaseStage):
                 self._print_progress(f"  Track {track_id}: Early stopping")
                 break
 
+        # Print final stats
         final_improvement = best_score - (initial_prompt.average_score or 0)
         self._print_progress(
             f"  Track {track_id}: Complete (final={best_score:.2f}, "
@@ -187,7 +178,16 @@ class RefinementStage(BaseStage):
         )
 
     async def _analyze_weaknesses(self, prompt: PromptCandidate, context: RunContext) -> dict:
-        """Analyze a prompt's weaknesses based on evaluation results."""
+        """
+        Analyze a prompt's weaknesses based on evaluation results.
+
+        Args:
+            prompt: Prompt to analyze
+            context: Run context with database access
+
+        Returns:
+            Dictionary with weakness information
+        """
         # Get evaluations from database
         db_evaluations = context.eval_repo.get_by_prompt(prompt.id)
 
@@ -217,6 +217,106 @@ class RefinementStage(BaseStage):
             "failed_tests": failed_test_descriptions,
             "failed_test_ids": failed_test_ids,
         }
+
+    def _save_weakness_analysis(
+        self, context: RunContext, weakness_analysis: WeaknessAnalysis, prompt_id: str
+    ) -> None:
+        """
+        Save weakness analysis to database.
+
+        Args:
+            context: Run context with database access
+            weakness_analysis: Weakness analysis to save
+            prompt_id: Prompt ID this analysis belongs to
+        """
+        db_weakness = WeaknessAnalysisConverter.to_db(weakness_analysis, prompt_id)
+        context._session.add(db_weakness)
+        context._session.commit()
+
+    async def _generate_refinement(
+        self,
+        context: RunContext,
+        task_spec,
+        current_prompt_text: str,
+        weakness_description: str,
+        failed_tests: list[str],
+        track_id: int,
+        iteration: int,
+    ) -> str:
+        """
+        Generate a refined prompt using the refiner agent.
+
+        Args:
+            context: Run context
+            task_spec: Task specification
+            current_prompt_text: Current prompt text
+            weakness_description: Description of weaknesses
+            failed_tests: List of failed test descriptions
+            track_id: Track identifier
+            iteration: Iteration number
+
+        Returns:
+            Refined prompt text
+        """
+        refiner = create_refiner_agent(
+            self.config.refiner_llm,
+            task_spec,
+            current_prompt_text,
+            weakness_description,
+            failed_tests,
+            iteration,
+        )
+        refinement_result = await Runner.run(
+            refiner, f"Refine prompt (track {track_id}, iteration {iteration})"
+        )
+        return self._parse_refined_prompt(refinement_result.final_output)
+
+    def _create_refined_prompt(self, track_id: int, iteration: int, refined_text: str) -> PromptCandidate:
+        """
+        Create a new refined prompt candidate.
+
+        Args:
+            track_id: Track identifier
+            iteration: Iteration number
+            refined_text: Refined prompt text
+
+        Returns:
+            New prompt candidate
+        """
+        return PromptCandidate(
+            id=f"track{track_id}_iter{iteration}_{uuid.uuid4().hex[:8]}",
+            prompt_text=refined_text,
+            stage="refined",
+            iteration=iteration,
+            track_id=track_id,
+        )
+
+    def _save_refined_prompt(
+        self, context: RunContext, refined_prompt: PromptCandidate, parent_prompt_id: str
+    ) -> None:
+        """
+        Save refined prompt to database with parent linkage.
+
+        Args:
+            context: Run context with database access
+            refined_prompt: Refined prompt to save
+            parent_prompt_id: ID of parent prompt
+        """
+        db_refined = PromptConverter.to_db(refined_prompt, context.run_id)
+        db_refined.parent_prompt_id = parent_prompt_id
+        context.prompt_repo.save(db_refined)
+
+    def _check_improvement(self, improvement: float) -> bool:
+        """
+        Check if improvement meets convergence threshold.
+
+        Args:
+            improvement: Improvement ratio
+
+        Returns:
+            True if improvement is sufficient
+        """
+        return improvement >= self.config.convergence_threshold
 
     def _parse_refined_prompt(self, agent_output: RefinedPromptOutput) -> str:
         """Parse refined prompt from agent output."""

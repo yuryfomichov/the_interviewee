@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from prompt_optimizer.types import TaskSpec
+from prompt_optimizer.schemas import TaskSpec
 
 
 class LLMConfig(BaseModel):

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 
 async def save_champion_questions(result: OptimizationResult, output_dir: str) -> Path:

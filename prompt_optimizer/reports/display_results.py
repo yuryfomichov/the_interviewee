@@ -1,6 +1,6 @@
 """Display optimization results to console."""
 
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 
 def display_results(result: OptimizationResult) -> None:

@@ -9,7 +9,7 @@ from prompt_optimizer.storage.models import (
     TestCase as DbTestCase,
     WeaknessAnalysis,
 )
-from prompt_optimizer.types import (
+from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
     TestCase as PydanticTestCase,

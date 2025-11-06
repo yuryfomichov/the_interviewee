@@ -11,7 +11,7 @@ from prompt_optimizer.storage.repositories import (
     RunRepository,
     TestCaseRepository,
 )
-from prompt_optimizer.types import TaskSpec
+from prompt_optimizer.schemas import TaskSpec
 
 
 class RunContext(BaseModel):

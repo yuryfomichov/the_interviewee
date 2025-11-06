@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from prompt_optimizer.config import LLMConfig, OptimizerConfig, TestDistribution
-from prompt_optimizer.types import TaskSpec
+from prompt_optimizer.schemas import TaskSpec
 
 ABC_SYSTEM_PROMPT = """You are an assistant in a smart journaling application called ABC. Your task is to help the user understand themselves, improve their mental health, answer their questions based on their notes in the journal, and so on. You will answer questions from the owner of the journal, be able to search through entries in the journal, analyze them, and make recommendations.
 

@@ -11,7 +11,7 @@ from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.model_tester import test_target_model
 from prompt_optimizer.optimizer.utils.score_calculator import aggregate_prompt_score
 from prompt_optimizer.storage import EvaluationConverter
-from prompt_optimizer.types import (
+from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
     TaskSpec,

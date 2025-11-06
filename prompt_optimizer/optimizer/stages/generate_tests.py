@@ -9,7 +9,7 @@ from prompt_optimizer.agents.test_designer_agent import (
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.storage import TestCaseConverter
-from prompt_optimizer.types import TestCase
+from prompt_optimizer.schemas import TestCase
 
 
 class GenerateTestsStage(BaseStage):

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from prompt_optimizer.types import OptimizationResult, TaskSpec
+from prompt_optimizer.schemas import OptimizationResult, TaskSpec
 
 
 async def save_optimization_report(
