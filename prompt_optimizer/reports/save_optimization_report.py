@@ -39,7 +39,7 @@ def save_optimization_report(
             f.write("=" * 70 + "\n")
             f.write(f"Rigorous Test Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
             f.write(
-                f"Status: {'Advanced to refinement' if result.original_system_prompt in result.stage2_top3 else 'Filtered out after quick tests'}\n"
+                f"Status: {'Advanced to refinement' if result.original_system_prompt in result.top_m_prompts else 'Filtered out after quick tests'}\n"
             )
             improvement = (
                 result.best_prompt.average_score

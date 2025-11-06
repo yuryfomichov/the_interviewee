@@ -32,7 +32,7 @@ def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
             }
             for prompt in result.initial_prompts
         ],
-        "stage1_top5": [
+        "quick_filter_top_prompts": [
             {
                 "id": prompt.id,
                 "track_id": prompt.track_id,
@@ -40,9 +40,9 @@ def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
                 "average_score": prompt.average_score,
                 "is_original_system_prompt": prompt.is_original_system_prompt,
             }
-            for prompt in result.stage1_top5
+            for prompt in result.top_k_prompts
         ],
-        "stage2_top3": [
+        "rigorous_filter_top_prompts": [
             {
                 "id": prompt.id,
                 "track_id": prompt.track_id,
@@ -50,7 +50,7 @@ def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
                 "average_score": prompt.average_score,
                 "is_original_system_prompt": prompt.is_original_system_prompt,
             }
-            for prompt in result.stage2_top3
+            for prompt in result.top_m_prompts
         ],
         "champion": {
             "id": result.best_prompt.id,
@@ -61,8 +61,8 @@ def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
         },
         "summary": {
             "total_initial_prompts": len(result.initial_prompts),
-            "total_stage1_top5": len(result.stage1_top5),
-            "total_stage2_top3": len(result.stage2_top3),
+            "quick_filter_top_count": len(result.top_k_prompts),
+            "rigorous_filter_top_count": len(result.top_m_prompts),
             "champion_score": result.best_prompt.average_score,
         },
     }
