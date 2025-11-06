@@ -164,7 +164,7 @@ class OptimizerConfig(BaseModel):
         return self.rigorous_test_distribution.total
 
     @property
-    def storage_path(self) -> Path:
+    def database_path(self) -> Path:
         """Compute the path to the optimizer SQLite database."""
         return Path(self.output_dir) / "storage" / "optimizer.db"
 

@@ -16,7 +16,7 @@ from prompt_optimizer.optimizer.stages import (
     SaveReportsStage,
     SelectTopPromptsStage,
 )
-from prompt_optimizer.storage import Storage
+from prompt_optimizer.storage import Database
 from prompt_optimizer.types import OptimizationResult
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class PromptOptimizer:
         self,
         model_client,
         config: OptimizerConfig | None = None,
-        storage: Storage | None = None,
+        database: Database | None = None,
     ):
         """
         Initialize the optimizer.
@@ -37,13 +37,13 @@ class PromptOptimizer:
         Args:
             model_client: Client for testing the target model.
             config: Optimizer configuration with a populated task_spec.
-            storage: Storage instance (creates new if None).
+            database: Database instance (creates new if None).
         """
         self.model_client = model_client
         if config is None:
             raise ValueError("OptimizerConfig with task_spec must be provided.")
         self.config = config
-        self.storage = storage or Storage(self.config.storage_path)
+        self.database = database or Database(self.config.database_path)
 
         # Set OpenAI API key in environment if provided in config
         if self.config.openai_api_key:
@@ -62,7 +62,7 @@ class PromptOptimizer:
         """
         stage_kwargs = {
             "config": self.config,
-            "storage": self.storage,
+            "database": self.database,
             "model_client": self.model_client,
             "progress_callback": self._print_progress,
         }
@@ -98,36 +98,54 @@ class PromptOptimizer:
             Optimization results with best prompt and detailed analysis
         """
         spec = self.config.task_spec
-
         start_time = time.time()
-        run_id = self.storage.start_optimization_run(spec.task_description)
 
-        # Create run-specific output directory
-        run_output_dir = self.config.results_path / f"run-{run_id:04d}"
-        run_output_dir.mkdir(parents=True, exist_ok=True)
+        # Create a database session for this optimization run
+        session = self.database.get_session()
 
-        self._print_progress("=== STARTING PROMPT OPTIMIZATION ===")
-        self._print_progress(f"Task: {spec.task_description}")
-        self._print_progress(f"Output directory: {run_output_dir}")
+        try:
+            # Create optimization run in database
+            from prompt_optimizer.storage.repositories import RunRepository
 
-        # Initialize context with run metadata
-        context = RunContext(
-            task_spec=spec,
-            output_dir=str(run_output_dir),
-            run_id=run_id,
-            start_time=start_time,
-        )
+            run_repo = RunRepository(session)
+            run = run_repo.create(spec.task_description)
+            run_id = run.id
 
-        # Execute all stages sequentially, each updating the context
-        for idx, stage in enumerate(self.stages):
-            self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
-            context = await stage.run(context)
+            # Create run-specific output directory
+            run_output_dir = self.config.results_path / f"run-{run_id:04d}"
+            run_output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Return the optimization result created by Stage 9 (ReportingStage)
-        if context.optimization_result is None:
-            raise RuntimeError("ReportingStage did not populate optimization_result")
+            self._print_progress("=== STARTING PROMPT OPTIMIZATION ===")
+            self._print_progress(f"Task: {spec.task_description}")
+            self._print_progress(f"Output directory: {run_output_dir}")
 
-        return context.optimization_result
+            # Initialize minimal context with run metadata
+            context = RunContext(
+                run_id=run_id,
+                task_spec=spec,
+                start_time=start_time,
+                output_dir=str(run_output_dir),
+            )
+            # Attach database session to context
+            context.set_session(session)
+
+            # Execute all stages sequentially, each updating the database
+            for idx, stage in enumerate(self.stages):
+                self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
+                context = await stage.run(context)
+                run_repo.update_stage(run_id, stage.name)
+
+            # Get the optimization result from the database (created by ReportingStage)
+            # For now, we'll return a placeholder - stages will need to be updated
+            # to build and return the OptimizationResult properly
+            raise NotImplementedError(
+                "Stages need to be refactored to work with new DB-first approach. "
+                "This will be done in the next phase."
+            )
+
+        finally:
+            # Always close the session
+            session.close()
 
     def _print_progress(self, message: str, end: str = "\n") -> None:
         """Print progress if verbose mode is enabled."""
