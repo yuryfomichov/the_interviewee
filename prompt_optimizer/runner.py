@@ -70,8 +70,6 @@ class OptimizationRunner:
         if self.verbose:
             display_results(result)
 
-        # Reports are now saved by Stage 10 (SaveReportsStage) in the optimizer pipeline
-
         return result
 
     def _print_header(self) -> None:
