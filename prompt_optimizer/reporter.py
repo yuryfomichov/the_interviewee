@@ -33,9 +33,7 @@ def display_results(result: OptimizationResult) -> None:
         )
 
 
-def save_champion_prompt(
-    result: OptimizationResult, output_dir: str = "prompt_optimizer/data"
-) -> Path:
+def save_champion_prompt(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save champion prompt to file.
 
@@ -64,7 +62,7 @@ def save_champion_prompt(
 def save_optimization_report(
     result: OptimizationResult,
     task_spec: TaskSpec,
-    output_dir: str = "prompt_optimizer/data",
+    output_dir: str,
 ) -> Path:
     """
     Save detailed optimization report to file.
@@ -140,9 +138,7 @@ def save_optimization_report(
     return report_file
 
 
-def save_champion_qa_results(
-    result: OptimizationResult, output_dir: str = "prompt_optimizer/data"
-) -> Path:
+def save_champion_qa_results(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save all questions and answers for the champion prompt.
 
@@ -205,9 +201,7 @@ def save_champion_qa_results(
     return qa_file
 
 
-def save_champion_questions(
-    result: OptimizationResult, output_dir: str = "prompt_optimizer/data"
-) -> Path:
+def save_champion_questions(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save all test questions used to evaluate the champion prompt.
 
@@ -261,7 +255,7 @@ def save_original_prompt_quick_report(
     initial_prompts: list,
     top_k_prompts: list,
     storage,
-    output_dir: str = "prompt_optimizer/data",
+    output_dir: str,
 ) -> Path | None:
     """
     Save report for original system prompt after quick filter stage.
