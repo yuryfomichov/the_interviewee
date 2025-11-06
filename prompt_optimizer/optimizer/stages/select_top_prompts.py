@@ -2,7 +2,7 @@
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.reporter import save_original_prompt_quick_report
+from prompt_optimizer.reports import save_original_prompt_quick_report
 
 
 class SelectTopPromptsStage(BaseStage):

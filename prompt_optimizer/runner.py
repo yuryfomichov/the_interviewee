@@ -11,7 +11,7 @@ from pathlib import Path
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer import PromptOptimizer
-from prompt_optimizer.reporter import (
+from prompt_optimizer.reports import (
     display_results,
     save_champion_prompt,
     save_champion_qa_results,
