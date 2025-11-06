@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -46,7 +45,7 @@ async def main() -> None:
         return
 
     # Initialize connector for the target model that will be optimized
-    target_model = "gpt-4o-mini"
+    target_model = "gpt-5-nano"
     print(f"Initializing OpenAI connector with target model: {target_model}")
     connector = OpenAIConnector(api_key=api_key, model=target_model)
 
@@ -60,13 +59,12 @@ async def main() -> None:
     print(f"Evaluator model: {optimizer_config.evaluator_llm.model}")
     print()
 
-    output_dir = Path("prompt_optimizer/examples/abc_journaling/data")
+    output_dir = optimizer_config.results_path
     output_dir.mkdir(parents=True, exist_ok=True)
 
     runner = OptimizationRunner(
         connector=connector,
         config=optimizer_config,
-        output_dir=output_dir,
         verbose=True,
     )
 
@@ -80,7 +78,8 @@ async def main() -> None:
     print(f"Champion prompt ID: {result.best_prompt.id}")
     if result.best_prompt.track_id is not None:
         print(f"Refinement track: {result.best_prompt.track_id}")
-    print(f"\nResults saved in: {output_dir}")
+    results_dir = runner.last_run_dir or output_dir
+    print(f"\nResults saved in: {results_dir}")
     print()
 
 

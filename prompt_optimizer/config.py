@@ -1,5 +1,7 @@
 """Configuration for prompt optimizer with per-agent LLM settings."""
 
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from prompt_optimizer.types import TaskSpec
@@ -121,9 +123,9 @@ class OptimizerConfig(BaseModel):
         description="LLM for prompt refinement",
     )
 
-    # Storage
-    storage_path: str = Field(
-        default="prompt_optimizer/data/optimizer.db", description="SQLite database path"
+    # Output directories
+    output_dir: str | Path = Field(
+        default="prompt_optimizer/data", description="Directory for optimizer artifacts"
     )
 
     # Execution mode
@@ -160,3 +162,13 @@ class OptimizerConfig(BaseModel):
     def num_rigorous_tests(self) -> int:
         """Calculate total number of rigorous tests from distribution."""
         return self.rigorous_test_distribution.total
+
+    @property
+    def storage_path(self) -> Path:
+        """Compute the path to the optimizer SQLite database."""
+        return Path(self.output_dir) / "storage" / "optimizer.db"
+
+    @property
+    def results_path(self) -> Path:
+        """Directory for optimizer result artifacts."""
+        return Path(self.output_dir) / "results"

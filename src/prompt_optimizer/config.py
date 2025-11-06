@@ -89,8 +89,6 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
         test_designer_llm=LLMConfig(model="gpt-5-nano"),
         evaluator_llm=LLMConfig(model="gpt-5-nano"),
         refiner_llm=LLMConfig(model="gpt-5-nano"),
-        # Output
-        storage_path="prompt_optimizer/data/optimizer.db",
         verbose=True,
         # API Configuration
         openai_api_key=api_key,

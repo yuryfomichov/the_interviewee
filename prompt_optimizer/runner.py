@@ -5,6 +5,7 @@ to run the optimization pipeline.
 """
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from prompt_optimizer.config import OptimizerConfig
@@ -27,7 +28,6 @@ class OptimizationRunner:
         self,
         connector: BaseConnector,
         config: OptimizerConfig,
-        output_dir: str | Path = "prompt_optimizer/data",
         verbose: bool = True,
     ):
         """Initialize the optimization runner.
@@ -35,12 +35,13 @@ class OptimizationRunner:
         Args:
             connector: Connector for testing the target model
             config: Optimizer configuration with task specification
-            output_dir: Directory for saving results
             verbose: Whether to print progress messages
         """
         self.connector = connector
         self.config = config
-        self.output_dir = Path(output_dir)
+        self.results_root = config.results_path
+        self.results_root.mkdir(parents=True, exist_ok=True)
+        self.last_run_dir: Path | None = None
         self.verbose = verbose
 
         if config.task_spec is None:
@@ -62,11 +63,14 @@ class OptimizationRunner:
 
         result = await self.optimizer.optimize()
 
+        run_output_dir = self._prepare_run_directory(result.run_id)
+        self.last_run_dir = run_output_dir
+
         if self.verbose:
             display_results(result)
 
-        save_champion_prompt(result, output_dir=str(self.output_dir))
-        save_optimization_report(result, self.config.task_spec, output_dir=str(self.output_dir))
+        save_champion_prompt(result, output_dir=str(run_output_dir))
+        save_optimization_report(result, self.config.task_spec, output_dir=str(run_output_dir))
 
         return result
 
@@ -97,3 +101,15 @@ class OptimizationRunner:
         print()
         print("Starting optimization...")
         print()
+
+    def _prepare_run_directory(self, run_id: int | None) -> Path:
+        """Create and return run-specific output directory."""
+        if run_id is not None:
+            folder_name = f"run-{run_id:04d}"
+        else:
+            timestamp = datetime.now().strftime("run-%Y%m%d-%H%M%S")
+            folder_name = timestamp
+
+        run_path = self.results_root / folder_name
+        run_path.mkdir(parents=True, exist_ok=True)
+        return run_path

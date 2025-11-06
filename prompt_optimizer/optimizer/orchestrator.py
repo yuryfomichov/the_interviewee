@@ -124,6 +124,7 @@ class PromptOptimizer:
         self.storage.complete_optimization_run(run_id, champion.id, total_tests)
 
         return OptimizationResult(
+            run_id=run_id,
             best_prompt=champion,
             all_tracks=context.refinement_tracks,
             initial_prompts=context.initial_prompts,

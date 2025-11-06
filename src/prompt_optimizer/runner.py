@@ -60,12 +60,9 @@ async def run_optimization() -> OptimizationResult | None:
         runner = OptimizationRunner(
             connector=rag_connector,
             config=optimizer_config,
-            output_dir="prompt_optimizer/data",
             verbose=True,
         )
-        result = await runner.run()
-
-        return result
+        return await runner.run()
 
     except Exception as e:
         logger.error(f"Optimization failed: {e}", exc_info=True)

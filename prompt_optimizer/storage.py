@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class Storage:
     """SQLite-based storage for optimization tracking."""
 
-    def __init__(self, db_path: str = "prompt_optimizer/data/optimizer.db"):
+    def __init__(self, db_path: str | Path = "prompt_optimizer/data/optimizer.db"):
         """Initialize storage and create tables if needed."""
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -22,7 +22,7 @@ class Storage:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Get a database connection."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         return conn
 

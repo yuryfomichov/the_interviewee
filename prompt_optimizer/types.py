@@ -108,6 +108,7 @@ class RefinementTrackResult(BaseModel):
 class OptimizationResult(BaseModel):
     """Final results from the entire optimization process."""
 
+    run_id: int | None = Field(default=None, description="Identifier for the storage run")
     best_prompt: PromptCandidate = Field(description="Champion prompt")
     all_tracks: list[RefinementTrackResult] = Field(description="Results from all 3 tracks")
     initial_prompts: list[PromptCandidate] = Field(description="All 15 initial prompts")

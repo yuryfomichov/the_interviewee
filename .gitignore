@@ -63,4 +63,4 @@ career_data/
 .DS_Store
 
 prompts/
-prompt_optimizer/data
+prompt_optimizer_data/
