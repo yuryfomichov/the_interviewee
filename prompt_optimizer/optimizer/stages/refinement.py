@@ -5,7 +5,7 @@ import uuid
 
 from agents import Runner
 
-from prompt_optimizer.agents.refiner_agent import create_refiner_agent
+from prompt_optimizer.agents.refiner_agent import RefinedPromptOutput, create_refiner_agent
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
@@ -33,9 +33,13 @@ class RefinementStage(BaseStage):
         prompts = context.top_m_prompts
         self._print_progress(f"Launching {len(prompts)} parallel refinement tracks...")
 
+        # Create global semaphore for all refinement evaluations
+        semaphore = asyncio.Semaphore(self.config.max_concurrent_evaluations)
+
         # Run tracks in parallel
         tasks = [
-            self._refinement_track(prompt, context, track_id=i) for i, prompt in enumerate(prompts)
+            self._refinement_track(prompt, context, track_id=i, semaphore=semaphore)
+            for i, prompt in enumerate(prompts)
         ]
         track_results = await asyncio.gather(*tasks)
 
@@ -58,7 +62,7 @@ class RefinementStage(BaseStage):
         track_results = []
         for i, prompt in enumerate(prompts):
             self._print_progress(f"\nStarting refinement track {i + 1}/{len(prompts)}...")
-            result = await self._refinement_track(prompt, context, track_id=i)
+            result = await self._refinement_track(prompt, context, track_id=i, semaphore=None)
             track_results.append(result)
 
         context.refinement_tracks = track_results
@@ -69,6 +73,7 @@ class RefinementStage(BaseStage):
         initial_prompt: PromptCandidate,
         context: RunContext,
         track_id: int,
+        semaphore: asyncio.Semaphore | None = None,
     ) -> RefinementTrackResult:
         """Run a single refinement track with iterative improvements."""
         rigorous_tests = context.rigorous_tests
@@ -120,6 +125,8 @@ class RefinementStage(BaseStage):
                 self.config,
                 self.model_client,
                 self.storage,
+                parallel=True,
+                semaphore=semaphore,
             )
             refined_prompt.average_score = new_score
             self.storage.save_prompt(refined_prompt)
@@ -190,6 +197,6 @@ class RefinementStage(BaseStage):
             "failed_tests": failed_test_descriptions,
         }
 
-    def _parse_refined_prompt(self, agent_output) -> str:
+    def _parse_refined_prompt(self, agent_output: RefinedPromptOutput) -> str:
         """Parse refined prompt from agent output."""
         return agent_output.improved_prompt

@@ -1,6 +1,7 @@
 """Evaluate prompts stage: Run prompts against test cases."""
 
 import asyncio
+from typing import Literal
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
@@ -10,7 +11,9 @@ from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
 class EvaluatePromptsStage(BaseStage):
     """Evaluate prompts against test cases."""
 
-    def __init__(self, stage_name: str, *args, **kwargs):
+    stage_name: Literal["quick_filter", "rigorous"]
+
+    def __init__(self, stage_name: Literal["quick_filter", "rigorous"], *args, **kwargs):
         """
         Initialize evaluation stage.
 
@@ -28,7 +31,7 @@ class EvaluatePromptsStage(BaseStage):
 
     async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Evaluate prompts against test cases in parallel.
+        Evaluate prompts against test cases in parallel with global concurrency control.
 
         Args:
             context: Run context with prompts and tests
@@ -44,13 +47,26 @@ class EvaluatePromptsStage(BaseStage):
             prompts = context.top_k_prompts
             tests = context.rigorous_tests
 
+        total_evaluations = len(prompts) * len(tests)
         self._print_progress(
-            f"Evaluating {len(prompts)} prompts × {len(tests)} tests (parallel)..."
+            f"Evaluating {len(prompts)} prompts × {len(tests)} tests "
+            f"({total_evaluations} total evaluations, max {self.config.max_concurrent_evaluations} concurrent)..."
         )
 
+        # Create global semaphore shared across ALL evaluations (prompts × tests)
+        semaphore = asyncio.Semaphore(self.config.max_concurrent_evaluations)
+
+        # Evaluate all prompts in parallel (semaphore controls test-level concurrency)
         eval_tasks = [
             evaluate_prompt(
-                prompt, tests, context.task_spec, self.config, self.model_client, self.storage
+                prompt,
+                tests,
+                context.task_spec,
+                self.config,
+                self.model_client,
+                self.storage,
+                parallel=True,
+                semaphore=semaphore,
             )
             for prompt in prompts
         ]
@@ -70,7 +86,7 @@ class EvaluatePromptsStage(BaseStage):
 
     async def _run_sync(self, context: RunContext) -> RunContext:
         """
-        Evaluate prompts against test cases sequentially.
+        Evaluate prompts against test cases sequentially (no concurrency).
 
         Args:
             context: Run context with prompts and tests
@@ -86,14 +102,24 @@ class EvaluatePromptsStage(BaseStage):
             prompts = context.top_k_prompts
             tests = context.rigorous_tests
 
+        total_evaluations = len(prompts) * len(tests)
         self._print_progress(
-            f"Evaluating {len(prompts)} prompts × {len(tests)} tests (sequential)..."
+            f"Evaluating {len(prompts)} prompts × {len(tests)} tests "
+            f"({total_evaluations} total evaluations, sequential mode)..."
         )
 
+        # No semaphore in sequential mode - everything runs one at a time
         for i, prompt in enumerate(prompts, 1):
             self._print_progress(f"  Evaluating prompt {i}/{len(prompts)}...")
             avg_score = await evaluate_prompt(
-                prompt, tests, context.task_spec, self.config, self.model_client, self.storage
+                prompt,
+                tests,
+                context.task_spec,
+                self.config,
+                self.model_client,
+                self.storage,
+                parallel=False,
+                semaphore=None,
             )
             prompt.average_score = avg_score
             prompt.stage = self.stage_name

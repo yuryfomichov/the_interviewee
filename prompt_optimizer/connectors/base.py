@@ -12,7 +12,7 @@ class BaseConnector(ABC):
     """
 
     @abstractmethod
-    def test_prompt(self, system_prompt: str, message: str) -> str:
+    async def test_prompt(self, system_prompt: str, message: str) -> str:
         """Test the target model with a system prompt and user message.
 
         Args:

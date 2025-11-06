@@ -131,6 +131,11 @@ class OptimizerConfig(BaseModel):
         default=False,
         description="Run stages in parallel mode (True) or sequential/sync mode (False)",
     )
+    max_concurrent_evaluations: int = Field(
+        default=5,
+        ge=1,
+        description="Maximum number of concurrent LLM evaluations (helps avoid rate limits)",
+    )
 
     # Progress reporting
     verbose: bool = Field(default=True, description="Print progress updates")

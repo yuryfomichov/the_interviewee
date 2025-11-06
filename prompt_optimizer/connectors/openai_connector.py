@@ -2,7 +2,7 @@
 
 import logging
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from prompt_optimizer.connectors.base import BaseConnector
 
@@ -19,12 +19,12 @@ class OpenAIConnector(BaseConnector):
             api_key: OpenAI API key
             model: Model to use (default: gpt-4o-mini)
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
         logger.info(f"OpenAIConnector initialized with model {model}")
 
-    def test_prompt(self, system_prompt: str, message: str) -> str:
-        """Test via OpenAI API.
+    async def test_prompt(self, system_prompt: str, message: str) -> str:
+        """Test via OpenAI API (async).
 
         Args:
             system_prompt: System prompt to use
@@ -34,8 +34,8 @@ class OpenAIConnector(BaseConnector):
             Model response
         """
         try:
-            # Using the responses API pattern
-            response = self.client.chat.completions.with_raw_response.create(
+            # Using the async API
+            response = await self.client.chat.completions.with_raw_response.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

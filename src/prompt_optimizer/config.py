@@ -97,4 +97,5 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
         # Task Spec
         task_spec=create_task_spec(),
         parallel_execution=True,
+        max_concurrent_evaluations=8,
     )

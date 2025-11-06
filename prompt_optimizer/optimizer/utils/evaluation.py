@@ -1,8 +1,10 @@
 """Shared evaluation logic for testing prompts."""
 
+import asyncio
+
 from agents import Runner
 
-from prompt_optimizer.agents.evaluator_agent import create_evaluator_agent
+from prompt_optimizer.agents.evaluator_agent import EvaluationOutput, create_evaluator_agent
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer.utils.model_tester import test_target_model
@@ -24,9 +26,11 @@ async def evaluate_prompt(
     config: OptimizerConfig,
     model_client: BaseConnector,
     storage: Storage,
+    parallel: bool = True,
+    semaphore: asyncio.Semaphore | None = None,
 ) -> float:
     """
-    Evaluate a prompt against test cases and return average score.
+    Evaluate a single prompt against test cases and return average score.
 
     Args:
         prompt: Prompt candidate to evaluate
@@ -35,15 +39,27 @@ async def evaluate_prompt(
         config: Optimizer configuration
         model_client: Connector for the target model
         storage: Storage instance for saving results
+        parallel: Whether to run evaluations in parallel (default: True)
+        semaphore: Optional shared semaphore for global concurrency control.
+                   If None and parallel=True, creates a local semaphore.
 
     Returns:
         Average score across all test cases
     """
-    evaluations = []
 
-    for test in test_cases:
+    async def evaluate_single_test(test: TestCase) -> EvaluationScore:
+        """Evaluate a single test case with optional concurrency control."""
+        # Acquire semaphore if provided
+        if semaphore:
+            async with semaphore:
+                return await _evaluate_test_impl(test)
+        else:
+            return await _evaluate_test_impl(test)
+
+    async def _evaluate_test_impl(test: TestCase) -> EvaluationScore:
+        """Implementation of single test evaluation."""
         # Get model response
-        response = test_target_model(prompt.prompt_text, test.input_message, model_client)
+        response = await test_target_model(prompt.prompt_text, test.input_message, model_client)
 
         # Score with LLM judge
         evaluator = create_evaluator_agent(config.evaluator_llm, task_spec, test)
@@ -52,14 +68,14 @@ async def evaluate_prompt(
             f"Score this response:\n\n{response}\n\nProvide scores in JSON format.",
         )
 
-        # Parse evaluation
-        eval_data = _parse_evaluation(eval_result.final_output)
+        # Parse evaluation (final_output is EvaluationOutput due to agent's output_type)
+        eval_output: EvaluationOutput = eval_result.final_output  # type: ignore[assignment]
         evaluation = EvaluationScore.calculate_overall(
-            functionality=eval_data["functionality"],
-            safety=eval_data["safety"],
-            consistency=eval_data["consistency"],
-            edge_case_handling=eval_data["edge_case_handling"],
-            reasoning=eval_data["reasoning"],
+            functionality=eval_output.functionality,
+            safety=eval_output.safety,
+            consistency=eval_output.consistency,
+            edge_case_handling=eval_output.edge_case_handling,
+            reasoning=eval_output.reasoning,
             weights=config.scoring_weights,
         )
 
@@ -71,20 +87,15 @@ async def evaluate_prompt(
             evaluation=evaluation,
         )
         storage.save_evaluation(test_result)
-        evaluations.append(evaluation)
+        return evaluation
+
+    # Run evaluations in parallel or sequentially based on config
+    if parallel:
+        evaluations = await asyncio.gather(*[evaluate_single_test(test) for test in test_cases])
+    else:
+        evaluations = []
+        for test in test_cases:
+            evaluation = await evaluate_single_test(test)
+            evaluations.append(evaluation)
 
     return aggregate_prompt_score(evaluations)
-
-
-def _parse_evaluation(agent_output) -> dict:
-    """
-    Parse agent evaluation output.
-
-    Args:
-        agent_output: EvaluationOutput object from the agent
-
-    Returns:
-        Dict with evaluation scores
-    """
-    # Agent returns a Pydantic object (EvaluationOutput)
-    return agent_output.model_dump()
