@@ -55,7 +55,7 @@ class SelectTopPromptsStage(BaseStage):
             context.top_k_prompts = top_prompts
 
             # Save original prompt quick test report if available
-            if self.output_dir:
+            if context.output_dir:
                 original_prompt = next(
                     (p for p in context.initial_prompts if p.is_original_system_prompt), None
                 )
@@ -67,7 +67,7 @@ class SelectTopPromptsStage(BaseStage):
                         initial_prompts=context.initial_prompts,
                         top_k_prompts=context.top_k_prompts,
                         storage=self.storage,
-                        output_dir=self.output_dir,
+                        output_dir=context.output_dir,
                     )
         else:  # rigorous
             context.top_m_prompts = top_prompts

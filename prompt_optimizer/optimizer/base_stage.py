@@ -22,7 +22,6 @@ class BaseStage(ABC):
         storage: Storage,
         model_client: BaseConnector,
         progress_callback: Callable[[str], None] | None = None,
-        output_dir: str | None = None,
     ):
         """
         Initialize stage.
@@ -32,13 +31,11 @@ class BaseStage(ABC):
             storage: Storage instance
             model_client: Connector for testing the target model
             progress_callback: Optional callback for progress messages
-            output_dir: Optional directory for saving intermediate reports
         """
         self.config = config
         self.storage = storage
         self.model_client = model_client
         self._print_progress = progress_callback or (lambda msg: None)
-        self.output_dir = output_dir
 
     async def run(self, context: RunContext) -> RunContext:
         """

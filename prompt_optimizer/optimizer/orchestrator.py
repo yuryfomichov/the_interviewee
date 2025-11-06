@@ -66,7 +66,6 @@ class PromptOptimizer:
             "storage": self.storage,
             "model_client": self.model_client,
             "progress_callback": self._print_progress,
-            "output_dir": self.output_dir,
         }
 
         return [
@@ -104,7 +103,7 @@ class PromptOptimizer:
         self._print_progress(f"Task: {spec.task_description}")
 
         # Initialize context
-        context = RunContext(task_spec=spec)
+        context = RunContext(task_spec=spec, output_dir=self.output_dir)
 
         # Execute all stages sequentially, each updating the context
         for idx, stage in enumerate(self.stages):
