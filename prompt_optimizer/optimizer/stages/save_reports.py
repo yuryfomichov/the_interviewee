@@ -8,6 +8,8 @@ from prompt_optimizer.reports import (
     save_champion_questions,
     save_optimization_report,
     save_original_prompt_rigorous_results,
+    save_prompts_json,
+    save_testcases_json,
 )
 
 
@@ -71,6 +73,8 @@ class SaveReportsStage(BaseStage):
         save_champion_questions(result, output_dir=output_dir)
         save_champion_qa_results(result, output_dir=output_dir)
         save_original_prompt_rigorous_results(result, output_dir=output_dir)
+        save_testcases_json(result, output_dir=output_dir)
+        save_prompts_json(result, output_dir=output_dir)
 
         self._print_progress("All reports saved successfully.")
 
