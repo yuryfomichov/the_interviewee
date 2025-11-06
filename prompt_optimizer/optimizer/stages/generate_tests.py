@@ -8,6 +8,7 @@ from prompt_optimizer.agents.test_designer_agent import (
 )
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
+from prompt_optimizer.storage import TestCaseConverter
 from prompt_optimizer.types import TestCase
 
 
@@ -38,7 +39,7 @@ class GenerateTestsStage(BaseStage):
             context: Run context with task_spec
 
         Returns:
-            Updated context with quick_tests or rigorous_tests populated
+            Updated context (test cases saved to database)
         """
         num_tests = (
             self.config.num_quick_tests
@@ -65,17 +66,11 @@ class GenerateTestsStage(BaseStage):
         )
         tests = self._parse_test_cases(test_result.final_output)
 
-        # Save tests to storage
-        for test in tests:
-            self.storage.save_test_case(test, self.test_stage)
+        # Save all test cases to database
+        db_tests = [TestCaseConverter.to_db(test, context.run_id, self.test_stage) for test in tests]
+        context.test_repo.save_many(db_tests)
 
         self._print_progress(f"Generated {len(tests)} {self.test_stage} test cases")
-
-        # Update context
-        if self.test_stage == "quick":
-            context.quick_tests = tests
-        else:
-            context.rigorous_tests = tests
 
         return context
 

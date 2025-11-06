@@ -1,5 +1,11 @@
 """Storage layer for prompt optimizer using SQLAlchemy."""
 
+from prompt_optimizer.storage.converters import (
+    EvaluationConverter,
+    PromptConverter,
+    TestCaseConverter,
+    WeaknessAnalysisConverter,
+)
 from prompt_optimizer.storage.database import Database
 from prompt_optimizer.storage.models import (
     Base,
@@ -30,4 +36,8 @@ __all__ = [
     "TestCaseRepository",
     "EvaluationRepository",
     "RunRepository",
+    "PromptConverter",
+    "TestCaseConverter",
+    "EvaluationConverter",
+    "WeaknessAnalysisConverter",
 ]

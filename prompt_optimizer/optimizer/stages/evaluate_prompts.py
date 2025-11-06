@@ -6,6 +6,7 @@ from typing import Literal
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
+from prompt_optimizer.storage import PromptConverter, TestCaseConverter
 
 
 class EvaluatePromptsStage(BaseStage):
@@ -34,31 +35,35 @@ class EvaluatePromptsStage(BaseStage):
         Evaluate prompts against test cases in parallel with global concurrency control.
 
         Args:
-            context: Run context with prompts and tests
+            context: Run context with database access
 
         Returns:
-            Updated context with prompts having updated scores
+            Updated context (prompts updated with scores in database)
         """
-        # Determine which prompts and tests to use
+        # Query prompts and tests from database
         original_prompt_for_comparison = None
 
         if self.stage_name == "quick_filter":
-            prompts = context.initial_prompts
-            tests = context.quick_tests
+            # Get all prompts from initial stage
+            db_prompts = context.prompt_repo.get_by_stage(context.run_id, "initial")
+            db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
         else:  # rigorous
-            prompts = context.top_k_prompts.copy()
-            tests = context.rigorous_tests
+            # Get top K prompts from quick_filter stage
+            db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
+            db_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
 
             # For rigorous evaluation, check if we need to evaluate original prompt for comparison
-            original_prompt = next(
-                (p for p in context.initial_prompts if p.is_original_system_prompt), None
-            )
-            if original_prompt and original_prompt not in prompts:
+            original_db_prompt = context.prompt_repo.get_original_prompt(context.run_id)
+            if original_db_prompt and original_db_prompt not in db_prompts:
                 self._print_progress(
                     "Adding original prompt for rigorous evaluation (parallel with top_k)..."
                 )
-                prompts.append(original_prompt)
-                original_prompt_for_comparison = original_prompt
+                db_prompts.append(original_db_prompt)
+                original_prompt_for_comparison = original_db_prompt
+
+        # Convert to Pydantic models for evaluation
+        prompts = [PromptConverter.from_db(p) for p in db_prompts]
+        tests = [TestCaseConverter.from_db(t) for t in db_tests]
 
         total_evaluations = len(prompts) * len(tests)
         self._print_progress(
@@ -77,7 +82,7 @@ class EvaluatePromptsStage(BaseStage):
                 context.task_spec,
                 self.config,
                 self.model_client,
-                self.storage,
+                context,
                 parallel=True,
                 semaphore=semaphore,
             )
@@ -86,6 +91,7 @@ class EvaluatePromptsStage(BaseStage):
 
         scores = await asyncio.gather(*eval_tasks)
 
+        # Update prompts with scores and save to database
         for prompt, avg_score in zip(prompts, scores, strict=True):
             prompt.average_score = avg_score
             prompt.stage = self.stage_name
@@ -95,11 +101,15 @@ class EvaluatePromptsStage(BaseStage):
                     prompt.quick_score = avg_score
                 else:  # rigorous
                     prompt.rigorous_score = avg_score
-            self.storage.save_prompt(prompt)
+
+            # Save to database
+            db_prompt = PromptConverter.to_db(prompt, context.run_id)
+            context.prompt_repo.save(db_prompt)
 
         if original_prompt_for_comparison:
+            original_pydantic = PromptConverter.from_db(original_prompt_for_comparison)
             self._print_progress(
-                f"Original prompt rigorous score: {original_prompt_for_comparison.rigorous_score:.2f} "
+                f"Original prompt rigorous score: {original_pydantic.rigorous_score:.2f} "
                 "(evaluated for comparison only, not advancing to next stage)"
             )
 
@@ -114,31 +124,35 @@ class EvaluatePromptsStage(BaseStage):
         Evaluate prompts against test cases sequentially (no concurrency).
 
         Args:
-            context: Run context with prompts and tests
+            context: Run context with database access
 
         Returns:
-            Updated context with prompts having updated scores
+            Updated context (prompts updated with scores in database)
         """
-        # Determine which prompts and tests to use
+        # Query prompts and tests from database
         original_prompt_for_comparison = None
 
         if self.stage_name == "quick_filter":
-            prompts = context.initial_prompts
-            tests = context.quick_tests
+            # Get all prompts from initial stage
+            db_prompts = context.prompt_repo.get_by_stage(context.run_id, "initial")
+            db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
         else:  # rigorous
-            prompts = context.top_k_prompts.copy()
-            tests = context.rigorous_tests
+            # Get top K prompts from quick_filter stage
+            db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
+            db_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
 
             # For rigorous evaluation, check if we need to evaluate original prompt for comparison
-            original_prompt = next(
-                (p for p in context.initial_prompts if p.is_original_system_prompt), None
-            )
-            if original_prompt and original_prompt not in prompts:
+            original_db_prompt = context.prompt_repo.get_original_prompt(context.run_id)
+            if original_db_prompt and original_db_prompt not in db_prompts:
                 self._print_progress(
                     "Adding original prompt for rigorous evaluation (sequential with top_k)..."
                 )
-                prompts.append(original_prompt)
-                original_prompt_for_comparison = original_prompt
+                db_prompts.append(original_db_prompt)
+                original_prompt_for_comparison = original_db_prompt
+
+        # Convert to Pydantic models for evaluation
+        prompts = [PromptConverter.from_db(p) for p in db_prompts]
+        tests = [TestCaseConverter.from_db(t) for t in db_tests]
 
         total_evaluations = len(prompts) * len(tests)
         self._print_progress(
@@ -155,7 +169,7 @@ class EvaluatePromptsStage(BaseStage):
                 context.task_spec,
                 self.config,
                 self.model_client,
-                self.storage,
+                context,
                 parallel=False,
                 semaphore=None,
             )
@@ -167,11 +181,15 @@ class EvaluatePromptsStage(BaseStage):
                     prompt.quick_score = avg_score
                 else:  # rigorous
                     prompt.rigorous_score = avg_score
-            self.storage.save_prompt(prompt)
+
+            # Save to database
+            db_prompt = PromptConverter.to_db(prompt, context.run_id)
+            context.prompt_repo.save(db_prompt)
 
         if original_prompt_for_comparison:
+            original_pydantic = PromptConverter.from_db(original_prompt_for_comparison)
             self._print_progress(
-                f"Original prompt rigorous score: {original_prompt_for_comparison.rigorous_score:.2f} "
+                f"Original prompt rigorous score: {original_pydantic.rigorous_score:.2f} "
                 "(evaluated for comparison only, not advancing to next stage)"
             )
 
