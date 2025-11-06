@@ -107,32 +107,10 @@ class PromptOptimizer:
         # Initialize context
         context = RunContext(task_spec=spec, output_dir=str(run_output_dir))
 
-        # Track if we temporarily added original prompt for rigorous evaluation
-        original_prompt_added_for_rigorous = False
-
         # Execute all stages sequentially, each updating the context
         for idx, stage in enumerate(self.stages):
-            # Before Stage 6 (rigorous evaluation), add original prompt if needed
-            if idx == 5:  # Stage 6 is index 5 (0-based)
-                original_prompt = next(
-                    (p for p in context.initial_prompts if p.is_original_system_prompt), None
-                )
-                if original_prompt and original_prompt not in context.top_k_prompts:
-                    self._print_progress(
-                        "\nAdding original prompt for rigorous evaluation (in parallel with top_k)..."
-                    )
-                    context.top_k_prompts.append(original_prompt)
-                    original_prompt_added_for_rigorous = True
-
             self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
             context = await stage.run(context)
-
-            # After Stage 6, remove original prompt if we added it temporarily
-            if idx == 5 and original_prompt_added_for_rigorous:
-                self._print_progress(
-                    "\nRemoving original prompt from top_k (was evaluated for comparison only)..."
-                )
-                context.top_k_prompts.remove(original_prompt)
 
         # Extract results from context
         champion = max(
