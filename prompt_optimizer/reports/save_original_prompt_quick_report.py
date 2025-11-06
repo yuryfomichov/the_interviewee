@@ -2,13 +2,15 @@
 
 from pathlib import Path
 
+from prompt_optimizer.storage import EvaluationConverter
+
 
 def save_original_prompt_quick_report(
     original_prompt,
     quick_tests: list,
     initial_prompts: list,
     top_k_prompts: list,
-    storage,
+    context,
     output_dir: str,
 ) -> Path | None:
     """
@@ -19,7 +21,7 @@ def save_original_prompt_quick_report(
         quick_tests: Quick test cases used
         initial_prompts: All initial prompts for ranking comparison
         top_k_prompts: Prompts that advanced to rigorous testing
-        storage: Storage instance to retrieve test results
+        context: Run context for database access
         output_dir: Directory to save the report
 
     Returns:
@@ -31,8 +33,9 @@ def save_original_prompt_quick_report(
     report_file = Path(output_dir) / "original_prompt_quick_report.txt"
     report_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Get test results for original prompt
-    test_results = storage.get_prompt_evaluations(original_prompt.id)
+    # Get test results for original prompt from database
+    db_evaluations = context.eval_repo.get_by_prompt(original_prompt.id)
+    test_results = [EvaluationConverter.from_db(ev) for ev in db_evaluations]
 
     # Create test case mapping
     test_case_map = {test.id: test for test in quick_tests}

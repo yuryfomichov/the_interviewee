@@ -135,13 +135,11 @@ class PromptOptimizer:
                 context = await stage.run(context)
                 run_repo.update_stage(run_id, stage.name)
 
-            # Get the optimization result from the database (created by ReportingStage)
-            # For now, we'll return a placeholder - stages will need to be updated
-            # to build and return the OptimizationResult properly
-            raise NotImplementedError(
-                "Stages need to be refactored to work with new DB-first approach. "
-                "This will be done in the next phase."
-            )
+            # Get the optimization result created by ReportingStage
+            if not hasattr(context, '_optimization_result'):
+                raise RuntimeError("ReportingStage did not create optimization result")
+
+            return context._optimization_result  # type: ignore
 
         finally:
             # Always close the session

@@ -28,17 +28,17 @@ class SaveReportsStage(BaseStage):
         Save all reports to disk concurrently (async mode).
 
         Args:
-            context: Run context with optimization_result
+            context: Run context with _optimization_result
 
         Returns:
             Unchanged context (reports saved to disk)
         """
-        if context.optimization_result is None:
-            raise ValueError("optimization_result must be set in context")
+        if not hasattr(context, '_optimization_result'):
+            raise ValueError("_optimization_result must be set in context by ReportingStage")
         if context.output_dir is None:
             raise ValueError("output_dir must be set in context")
 
-        result = context.optimization_result
+        result = context._optimization_result  # type: ignore
         output_dir = context.output_dir
 
         self._print_progress("\nSaving final reports...")
@@ -62,17 +62,17 @@ class SaveReportsStage(BaseStage):
         Save all reports to disk sequentially (sync mode).
 
         Args:
-            context: Run context with optimization_result
+            context: Run context with _optimization_result
 
         Returns:
             Unchanged context (reports saved to disk)
         """
-        if context.optimization_result is None:
-            raise ValueError("optimization_result must be set in context")
+        if not hasattr(context, '_optimization_result'):
+            raise ValueError("_optimization_result must be set in context by ReportingStage")
         if context.output_dir is None:
             raise ValueError("output_dir must be set in context")
 
-        result = context.optimization_result
+        result = context._optimization_result  # type: ignore
         output_dir = context.output_dir
 
         self._print_progress("\nSaving final reports...")
