@@ -28,7 +28,6 @@ class PromptOptimizer:
         model_client,
         config: OptimizerConfig | None = None,
         storage: Storage | None = None,
-        output_dir: str | None = None,
     ):
         """
         Initialize the optimizer.
@@ -37,14 +36,12 @@ class PromptOptimizer:
             model_client: Client for testing the target model.
             config: Optimizer configuration with a populated task_spec.
             storage: Storage instance (creates new if None).
-            output_dir: Directory for saving intermediate reports (optional).
         """
         self.model_client = model_client
         if config is None:
             raise ValueError("OptimizerConfig with task_spec must be provided.")
         self.config = config
         self.storage = storage or Storage(self.config.storage_path)
-        self.output_dir = output_dir
 
         # Set OpenAI API key in environment if provided in config
         if self.config.openai_api_key:
@@ -99,11 +96,16 @@ class PromptOptimizer:
         start_time = time.time()
         run_id = self.storage.start_optimization_run(spec.task_description)
 
+        # Create run-specific output directory
+        run_output_dir = self.config.results_path / f"run-{run_id:04d}"
+        run_output_dir.mkdir(parents=True, exist_ok=True)
+
         self._print_progress("=== STARTING PROMPT OPTIMIZATION ===")
         self._print_progress(f"Task: {spec.task_description}")
+        self._print_progress(f"Output directory: {run_output_dir}")
 
         # Initialize context
-        context = RunContext(task_spec=spec, output_dir=self.output_dir)
+        context = RunContext(task_spec=spec, output_dir=str(run_output_dir))
 
         # Execute all stages sequentially, each updating the context
         for idx, stage in enumerate(self.stages):
@@ -136,6 +138,7 @@ class PromptOptimizer:
 
         return OptimizationResult(
             run_id=run_id,
+            output_dir=str(run_output_dir),
             best_prompt=champion,
             all_tracks=context.refinement_tracks,
             initial_prompts=context.initial_prompts,

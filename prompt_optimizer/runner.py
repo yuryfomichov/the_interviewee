@@ -61,41 +61,27 @@ class OptimizationRunner:
         if self.verbose:
             self._print_header()
 
-        # Prepare temporary output directory before optimization starts
-        # This allows intermediate reports to be saved during optimization
-        temp_output_dir = self._prepare_run_directory(None)
-
-        # Create optimizer with output directory for intermediate reports
+        # Create optimizer (it will create the output directory with proper run_id)
         self.optimizer = PromptOptimizer(
             model_client=self.connector,
             config=self.config,
-            output_dir=str(temp_output_dir),
         )
 
         result = await self.optimizer.optimize()
 
-        # Rename directory to use proper run_id now that we have it
-        if result.run_id is not None:
-            final_output_dir = self._prepare_run_directory(result.run_id)
-            if temp_output_dir != final_output_dir:
-                # Rename temp directory to final directory with run_id
-                temp_output_dir.rename(final_output_dir)
-                run_output_dir = final_output_dir
-            else:
-                run_output_dir = temp_output_dir
-        else:
-            run_output_dir = temp_output_dir
-
-        self.last_run_dir = run_output_dir
+        # Get output directory from result
+        run_output_dir = result.output_dir
+        self.last_run_dir = Path(run_output_dir) if run_output_dir else None
 
         if self.verbose:
             display_results(result)
 
-        # Save all final results
-        save_champion_prompt(result, output_dir=str(run_output_dir))
-        save_optimization_report(result, self.config.task_spec, output_dir=str(run_output_dir))
-        save_champion_questions(result, output_dir=str(run_output_dir))
-        save_champion_qa_results(result, output_dir=str(run_output_dir))
+        # Save all final results to the directory created by orchestrator
+        if run_output_dir:
+            save_champion_prompt(result, output_dir=run_output_dir)
+            save_optimization_report(result, self.config.task_spec, output_dir=run_output_dir)
+            save_champion_questions(result, output_dir=run_output_dir)
+            save_champion_qa_results(result, output_dir=run_output_dir)
 
         return result
 
