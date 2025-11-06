@@ -17,6 +17,7 @@ from prompt_optimizer.reporter import (
     save_champion_qa_results,
     save_champion_questions,
     save_optimization_report,
+    save_original_prompt_rigorous_results,
 )
 from prompt_optimizer.types import OptimizationResult
 
@@ -82,6 +83,7 @@ class OptimizationRunner:
             save_optimization_report(result, self.config.task_spec, output_dir=run_output_dir)
             save_champion_questions(result, output_dir=run_output_dir)
             save_champion_qa_results(result, output_dir=run_output_dir)
+            save_original_prompt_rigorous_results(result, output_dir=run_output_dir)
 
         return result
 

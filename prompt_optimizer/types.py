@@ -137,6 +137,12 @@ class OptimizationResult(BaseModel):
     original_system_prompt: PromptCandidate | None = Field(
         default=None, description="The original system prompt if provided"
     )
+    original_system_prompt_rigorous_score: float | None = Field(
+        default=None, description="Original prompt score on rigorous tests (for fair comparison)"
+    )
+    original_system_prompt_test_results: list[TestResult] = Field(
+        default_factory=list, description="All rigorous test results for original prompt"
+    )
     champion_test_results: list[TestResult] = Field(
         default_factory=list, description="All test results for the champion prompt"
     )

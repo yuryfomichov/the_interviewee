@@ -136,6 +136,37 @@ class PromptOptimizer:
         # Get all test results for the champion
         champion_test_results = self.storage.get_prompt_evaluations(champion.id)
 
+        # Evaluate original prompt with rigorous tests for fair comparison
+        original_rigorous_score = None
+        original_test_results = []
+        if original_prompt:
+            # Check if original prompt was evaluated with rigorous tests
+            was_in_top_k = original_prompt in context.top_k_prompts
+
+            if not was_in_top_k:
+                # Evaluate with rigorous tests now for comparison
+                self._print_progress("\nEvaluating original prompt with rigorous tests for comparison...")
+                from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
+
+                original_rigorous_score = await evaluate_prompt(
+                    original_prompt,
+                    context.rigorous_tests,
+                    spec,
+                    self.config,
+                    self.model_client,
+                    self.storage,
+                    parallel=self.config.parallel_execution,
+                    semaphore=None,
+                )
+                original_prompt.average_score = original_rigorous_score
+                self.storage.save_prompt(original_prompt)
+            else:
+                # It was already evaluated with rigorous tests
+                original_rigorous_score = original_prompt.average_score
+
+            # Get test results
+            original_test_results = self.storage.get_prompt_evaluations(original_prompt.id)
+
         return OptimizationResult(
             run_id=run_id,
             output_dir=str(run_output_dir),
@@ -149,6 +180,8 @@ class PromptOptimizer:
             quick_tests=context.quick_tests,
             rigorous_tests=context.rigorous_tests,
             original_system_prompt=original_prompt,
+            original_system_prompt_rigorous_score=original_rigorous_score,
+            original_system_prompt_test_results=original_test_results,
             champion_test_results=champion_test_results,
         )
 

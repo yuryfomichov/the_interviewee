@@ -87,23 +87,24 @@ def save_optimization_report(
         f.write(f"Total Time: {result.total_time_seconds:.1f}s\n\n")
 
         # Original system prompt performance
-        if result.original_system_prompt:
+        if result.original_system_prompt and result.original_system_prompt_rigorous_score:
             f.write("\n" + "=" * 70 + "\n")
-            f.write("ORIGINAL SYSTEM PROMPT PERFORMANCE\n")
+            f.write("ORIGINAL SYSTEM PROMPT PERFORMANCE (RIGOROUS TESTS)\n")
             f.write("=" * 70 + "\n")
-            f.write(f"Score: {result.original_system_prompt.average_score:.2f}\n")
+            f.write(f"Rigorous Test Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
             f.write(
-                f"Status: {'Advanced to refinement' if result.original_system_prompt in result.stage2_top3 else 'Filtered out'}\n"
+                f"Status: {'Advanced to refinement' if result.original_system_prompt in result.stage2_top3 else 'Filtered out after quick tests'}\n"
             )
-            if result.original_system_prompt.average_score:
-                improvement = (
-                    result.best_prompt.average_score
-                    - result.original_system_prompt.average_score
-                )
-                f.write(
-                    f"Improvement over original: {improvement:+.2f} "
-                    f"({improvement/result.original_system_prompt.average_score*100:+.1f}%)\n"
-                )
+            improvement = (
+                result.best_prompt.average_score
+                - result.original_system_prompt_rigorous_score
+            )
+            improvement_pct = (improvement / result.original_system_prompt_rigorous_score * 100)
+            f.write(
+                f"Improvement over original: {improvement:+.2f} "
+                f"({improvement_pct:+.1f}%)\n"
+            )
+            f.write(f"\nNote: Both scores based on {len(result.rigorous_tests)} rigorous tests for fair comparison.\n")
 
         f.write("\n" + "=" * 70 + "\n")
         f.write("TRACK RESULTS\n")
@@ -247,6 +248,74 @@ def save_champion_questions(result: OptimizationResult, output_dir: str) -> Path
 
     print(f"Champion test questions saved to: {questions_file}")
     return questions_file
+
+
+def save_original_prompt_rigorous_results(
+    result: OptimizationResult, output_dir: str
+) -> Path | None:
+    """
+    Save all rigorous test questions and answers for the original system prompt.
+
+    Args:
+        result: Optimization result containing original prompt test results
+        output_dir: Directory to save the file
+
+    Returns:
+        Path to saved file, or None if no original prompt
+    """
+    if not result.original_system_prompt or not result.original_system_prompt_test_results:
+        return None
+
+    qa_file = Path(output_dir) / "original_prompt_rigorous_results.txt"
+    qa_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a mapping of test_case_id to test case for easy lookup
+    test_case_map = {test.id: test for test in result.rigorous_tests}
+
+    with qa_file.open("w") as f:
+        f.write("ORIGINAL SYSTEM PROMPT - RIGOROUS TEST RESULTS\n")
+        f.write("=" * 70 + "\n")
+        f.write(f"Prompt ID: {result.original_system_prompt.id}\n")
+        f.write(f"Overall Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
+        f.write(f"Total Tests: {len(result.original_system_prompt_test_results)}\n")
+        f.write("=" * 70 + "\n\n")
+
+        # Group by category
+        by_category = {}
+        for test_result in result.original_system_prompt_test_results:
+            test_case = test_case_map.get(test_result.test_case_id)
+            if test_case:
+                category = test_case.category
+                if category not in by_category:
+                    by_category[category] = []
+                by_category[category].append((test_case, test_result))
+
+        # Write results by category
+        for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
+            if category not in by_category:
+                continue
+
+            f.write(f"\n{'=' * 70}\n")
+            f.write(f"{category.upper()} TESTS\n")
+            f.write(f"{'=' * 70}\n\n")
+
+            for test_case, test_result in by_category[category]:
+                f.write(f"Test ID: {test_case.id}\n")
+                f.write(f"{'-' * 70}\n")
+                f.write(f"QUESTION:\n{test_case.input_message}\n\n")
+                f.write(f"EXPECTED BEHAVIOR:\n{test_case.expected_behavior}\n\n")
+                f.write(f"ANSWER:\n{test_result.model_response}\n\n")
+                f.write(f"EVALUATION:\n")
+                f.write(f"  Overall Score: {test_result.evaluation.overall:.2f}/10\n")
+                f.write(f"  Functionality: {test_result.evaluation.functionality}/10\n")
+                f.write(f"  Safety: {test_result.evaluation.safety}/10\n")
+                f.write(f"  Consistency: {test_result.evaluation.consistency}/10\n")
+                f.write(f"  Edge Case Handling: {test_result.evaluation.edge_case_handling}/10\n")
+                f.write(f"  Reasoning: {test_result.evaluation.reasoning}\n")
+                f.write(f"\n")
+
+    print(f"Original prompt rigorous test results saved to: {qa_file}")
+    return qa_file
 
 
 def save_original_prompt_quick_report(
