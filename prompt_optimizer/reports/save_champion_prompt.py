@@ -2,10 +2,12 @@
 
 from pathlib import Path
 
+import aiofiles
+
 from prompt_optimizer.types import OptimizationResult
 
 
-def save_champion_prompt(result: OptimizationResult, output_dir: str) -> Path:
+async def save_champion_prompt(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save champion prompt to file.
 
@@ -18,7 +20,10 @@ def save_champion_prompt(result: OptimizationResult, output_dir: str) -> Path:
     """
     output_file = Path(output_dir) / "champion_prompt.txt"
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text(result.best_prompt.prompt_text)
+
+    async with aiofiles.open(output_file, "w") as f:
+        await f.write(result.best_prompt.prompt_text)
+
     print(f"\nChampion prompt saved to: {output_file}")
 
     # Display the champion prompt

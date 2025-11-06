@@ -2,10 +2,12 @@
 
 from pathlib import Path
 
+import aiofiles
+
 from prompt_optimizer.types import OptimizationResult
 
 
-def save_original_prompt_rigorous_results(
+async def save_original_prompt_rigorous_results(
     result: OptimizationResult, output_dir: str
 ) -> Path | None:
     """
@@ -27,47 +29,50 @@ def save_original_prompt_rigorous_results(
     # Create a mapping of test_case_id to test case for easy lookup
     test_case_map = {test.id: test for test in result.rigorous_tests}
 
-    with qa_file.open("w") as f:
-        f.write("ORIGINAL SYSTEM PROMPT - RIGOROUS TEST RESULTS\n")
-        f.write("=" * 70 + "\n")
-        f.write(f"Prompt ID: {result.original_system_prompt.id}\n")
-        f.write(f"Overall Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
-        f.write(f"Total Tests: {len(result.original_system_prompt_test_results)}\n")
-        f.write("=" * 70 + "\n\n")
+    lines = []
+    lines.append("ORIGINAL SYSTEM PROMPT - RIGOROUS TEST RESULTS\n")
+    lines.append("=" * 70 + "\n")
+    lines.append(f"Prompt ID: {result.original_system_prompt.id}\n")
+    lines.append(f"Overall Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
+    lines.append(f"Total Tests: {len(result.original_system_prompt_test_results)}\n")
+    lines.append("=" * 70 + "\n\n")
 
-        # Group by category
-        by_category = {}
-        for test_result in result.original_system_prompt_test_results:
-            test_case = test_case_map.get(test_result.test_case_id)
-            if test_case:
-                category = test_case.category
-                if category not in by_category:
-                    by_category[category] = []
-                by_category[category].append((test_case, test_result))
-
-        # Write results by category
-        for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
+    # Group by category
+    by_category = {}
+    for test_result in result.original_system_prompt_test_results:
+        test_case = test_case_map.get(test_result.test_case_id)
+        if test_case:
+            category = test_case.category
             if category not in by_category:
-                continue
+                by_category[category] = []
+            by_category[category].append((test_case, test_result))
 
-            f.write(f"\n{'=' * 70}\n")
-            f.write(f"{category.upper()} TESTS\n")
-            f.write(f"{'=' * 70}\n\n")
+    # Write results by category
+    for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
+        if category not in by_category:
+            continue
 
-            for test_case, test_result in by_category[category]:
-                f.write(f"Test ID: {test_case.id}\n")
-                f.write(f"{'-' * 70}\n")
-                f.write(f"QUESTION:\n{test_case.input_message}\n\n")
-                f.write(f"EXPECTED BEHAVIOR:\n{test_case.expected_behavior}\n\n")
-                f.write(f"ANSWER:\n{test_result.model_response}\n\n")
-                f.write(f"EVALUATION:\n")
-                f.write(f"  Overall Score: {test_result.evaluation.overall:.2f}/10\n")
-                f.write(f"  Functionality: {test_result.evaluation.functionality}/10\n")
-                f.write(f"  Safety: {test_result.evaluation.safety}/10\n")
-                f.write(f"  Consistency: {test_result.evaluation.consistency}/10\n")
-                f.write(f"  Edge Case Handling: {test_result.evaluation.edge_case_handling}/10\n")
-                f.write(f"  Reasoning: {test_result.evaluation.reasoning}\n")
-                f.write(f"\n")
+        lines.append(f"\n{'=' * 70}\n")
+        lines.append(f"{category.upper()} TESTS\n")
+        lines.append(f"{'=' * 70}\n\n")
+
+        for test_case, test_result in by_category[category]:
+            lines.append(f"Test ID: {test_case.id}\n")
+            lines.append(f"{'-' * 70}\n")
+            lines.append(f"QUESTION:\n{test_case.input_message}\n\n")
+            lines.append(f"EXPECTED BEHAVIOR:\n{test_case.expected_behavior}\n\n")
+            lines.append(f"ANSWER:\n{test_result.model_response}\n\n")
+            lines.append(f"EVALUATION:\n")
+            lines.append(f"  Overall Score: {test_result.evaluation.overall:.2f}/10\n")
+            lines.append(f"  Functionality: {test_result.evaluation.functionality}/10\n")
+            lines.append(f"  Safety: {test_result.evaluation.safety}/10\n")
+            lines.append(f"  Consistency: {test_result.evaluation.consistency}/10\n")
+            lines.append(f"  Edge Case Handling: {test_result.evaluation.edge_case_handling}/10\n")
+            lines.append(f"  Reasoning: {test_result.evaluation.reasoning}\n")
+            lines.append(f"\n")
+
+    async with aiofiles.open(qa_file, "w") as f:
+        await f.write("".join(lines))
 
     print(f"Original prompt rigorous test results saved to: {qa_file}")
     return qa_file

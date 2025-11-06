@@ -43,15 +43,15 @@ class SaveReportsStage(BaseStage):
 
         self._print_progress("\nSaving final reports...")
 
-        # Save all reports concurrently using thread pool
+        # Save all reports concurrently
         await asyncio.gather(
-            asyncio.to_thread(save_champion_prompt, result, output_dir),
-            asyncio.to_thread(save_optimization_report, result, context.task_spec, output_dir),
-            asyncio.to_thread(save_champion_questions, result, output_dir),
-            asyncio.to_thread(save_champion_qa_results, result, output_dir),
-            asyncio.to_thread(save_original_prompt_rigorous_results, result, output_dir),
-            asyncio.to_thread(save_testcases_json, result, output_dir),
-            asyncio.to_thread(save_prompts_json, result, output_dir),
+            save_champion_prompt(result, output_dir),
+            save_optimization_report(result, context.task_spec, output_dir),
+            save_champion_questions(result, output_dir),
+            save_champion_qa_results(result, output_dir),
+            save_original_prompt_rigorous_results(result, output_dir),
+            save_testcases_json(result, output_dir),
+            save_prompts_json(result, output_dir),
         )
 
         self._print_progress("All reports saved successfully.")
@@ -78,13 +78,13 @@ class SaveReportsStage(BaseStage):
         self._print_progress("\nSaving final reports...")
 
         # Save all reports sequentially
-        save_champion_prompt(result, output_dir=output_dir)
-        save_optimization_report(result, context.task_spec, output_dir=output_dir)
-        save_champion_questions(result, output_dir=output_dir)
-        save_champion_qa_results(result, output_dir=output_dir)
-        save_original_prompt_rigorous_results(result, output_dir=output_dir)
-        save_testcases_json(result, output_dir=output_dir)
-        save_prompts_json(result, output_dir=output_dir)
+        await save_champion_prompt(result, output_dir)
+        await save_optimization_report(result, context.task_spec, output_dir)
+        await save_champion_questions(result, output_dir)
+        await save_champion_qa_results(result, output_dir)
+        await save_original_prompt_rigorous_results(result, output_dir)
+        await save_testcases_json(result, output_dir)
+        await save_prompts_json(result, output_dir)
 
         self._print_progress("All reports saved successfully.")
         return context

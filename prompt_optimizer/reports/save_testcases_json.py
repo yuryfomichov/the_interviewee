@@ -3,10 +3,12 @@
 import json
 from pathlib import Path
 
+import aiofiles
+
 from prompt_optimizer.types import OptimizationResult
 
 
-def save_testcases_json(result: OptimizationResult, output_dir: str) -> Path:
+async def save_testcases_json(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save all test cases (quick and rigorous) to JSON file.
 
@@ -48,8 +50,8 @@ def save_testcases_json(result: OptimizationResult, output_dir: str) -> Path:
     }
 
     # Write to JSON file with pretty formatting
-    with testcases_file.open("w") as f:
-        json.dump(testcases_data, f, indent=2, ensure_ascii=False)
+    async with aiofiles.open(testcases_file, "w") as f:
+        await f.write(json.dumps(testcases_data, indent=2, ensure_ascii=False))
 
     print(f"Test cases saved to: {testcases_file}")
     return testcases_file

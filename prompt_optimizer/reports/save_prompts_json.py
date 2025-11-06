@@ -3,10 +3,12 @@
 import json
 from pathlib import Path
 
+import aiofiles
+
 from prompt_optimizer.types import OptimizationResult
 
 
-def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
+async def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
     """
     Save all tested prompts with their quick evaluation scores to JSON file.
 
@@ -78,8 +80,8 @@ def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path:
         }
 
     # Write to JSON file with pretty formatting
-    with prompts_file.open("w") as f:
-        json.dump(prompts_data, f, indent=2, ensure_ascii=False)
+    async with aiofiles.open(prompts_file, "w") as f:
+        await f.write(json.dumps(prompts_data, indent=2, ensure_ascii=False))
 
     print(f"Prompts with scores saved to: {prompts_file}")
     return prompts_file

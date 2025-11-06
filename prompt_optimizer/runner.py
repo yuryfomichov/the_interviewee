@@ -37,7 +37,6 @@ class OptimizationRunner:
         self.config = config
         self.results_root = config.results_path
         self.results_root.mkdir(parents=True, exist_ok=True)
-        self.last_run_dir: Path | None = None
         self.verbose = verbose
 
         if config.task_spec is None:
@@ -46,11 +45,11 @@ class OptimizationRunner:
         # Optimizer will be created in run() method with output_dir
         self.optimizer = None
 
-    async def run(self) -> OptimizationResult:
+    async def run(self) -> tuple[OptimizationResult, Path | None]:
         """Run the optimization pipeline with reporting.
 
         Returns:
-            OptimizationResult with champion prompt and metrics
+            Tuple of (OptimizationResult, last_run_dir path)
         """
         if self.verbose:
             self._print_header()
@@ -64,13 +63,12 @@ class OptimizationRunner:
         result = await self.optimizer.optimize()
 
         # Get output directory from result
-        run_output_dir = result.output_dir
-        self.last_run_dir = Path(run_output_dir) if run_output_dir else None
+        last_run_dir = Path(result.output_dir) if result.output_dir else None
 
         if self.verbose:
             display_results(result)
 
-        return result
+        return result, last_run_dir
 
     def _print_header(self) -> None:
         """Print optimization header."""
