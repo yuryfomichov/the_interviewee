@@ -73,6 +73,11 @@ CRITICAL: You MUST create the exact number specified for each category. Do not d
 
 **Categories**: core, edge, boundary, adversarial, consistency, format
 
+**USER MESSAGE STYLE REQUIREMENTS**:
+- Phrase each input_message as a natural request or instruction consistent with the task scenario. Do not prefix requests with meta labels (e.g., "Behavioral question:", "Format test:", "Coding task:") unless the domain normally requires those markers.
+- Reference supporting resources only when that interaction is part of the task expectations, and describe them using the terminology the scenario would naturally use (e.g., files for coding agents, brief summaries for interview coaching).
+- When you mention prior context, do so conversationally rather than listing resource names unless explicit identifiers are normal in that domain.
+
 Make tests specific, actionable, and diverse. Each test should reveal something important about prompt quality.
 """
 

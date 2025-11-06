@@ -33,6 +33,18 @@ def create_generator_agent(llm_config: LLMConfig, task_spec: TaskSpec, n: int = 
     Returns:
         Configured Agent instance
     """
+    current_prompt_section = ""
+    if task_spec.current_prompt:
+        current_prompt_section = f"""
+**REFERENCE PROMPT (FOR CONTEXT ONLY)**:
+{task_spec.current_prompt}
+
+**STRICT NON-REUSE POLICY**:
+- Study the reference prompt to understand the domain, tone, and constraints.
+- Generate each new prompt from scratch; do not reuse sentences, bullet structures, or formatting from the reference.
+- Incorporate relevant insights while expressing them in completely original language.
+"""
+
     instructions = f"""You are an expert prompt engineer who creates PRODUCTION-READY system prompts.
 
 **TASK**: {task_spec.task_description}
@@ -43,7 +55,7 @@ def create_generator_agent(llm_config: LLMConfig, task_spec: TaskSpec, n: int = 
 **VALIDATION RULES**:
 {chr(10).join(f"- {rule}" for rule in task_spec.validation_rules)}
 
-**CRITICAL REQUIREMENTS FOR EACH PROMPT**:
+{current_prompt_section}**CRITICAL REQUIREMENTS FOR EACH PROMPT**:
 
 1. **LENGTH**: Each prompt must be 300-600 words (15-30 sentences). This is NOT a summary - it's the COMPLETE prompt that will be used in production.
 

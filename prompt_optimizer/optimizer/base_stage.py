@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from prompt_optimizer.config import OptimizerConfig
-from prompt_optimizer.model_clients import ModelClient
+from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.storage import Storage
 
@@ -20,7 +20,7 @@ class BaseStage(ABC):
         self,
         config: OptimizerConfig,
         storage: Storage,
-        model_client: ModelClient,
+        model_client: BaseConnector,
         progress_callback: Callable[[str], None] | None = None,
     ):
         """
@@ -29,7 +29,7 @@ class BaseStage(ABC):
         Args:
             config: Optimizer configuration
             storage: Storage instance
-            model_client: Client for testing the target model
+            model_client: Connector for testing the target model
             progress_callback: Optional callback for progress messages
         """
         self.config = config

@@ -2,19 +2,19 @@
 
 import logging
 
-from prompt_optimizer.model_clients import ModelClient
+from prompt_optimizer.connectors import BaseConnector
 
 logger = logging.getLogger(__name__)
 
 
-def test_target_model(system_prompt: str, message: str, model_client: ModelClient) -> str:
+def test_target_model(system_prompt: str, message: str, model_client: BaseConnector) -> str:
     """
     Test the target model with a system prompt and message.
 
     Args:
         system_prompt: System prompt to test
         message: User message to send
-        model_client: Client for the target model
+        model_client: Connector for the target model
 
     Returns:
         Model's response string

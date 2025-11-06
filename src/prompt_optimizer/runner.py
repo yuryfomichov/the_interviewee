@@ -1,33 +1,30 @@
-"""Main runner for prompt optimization.
+"""RAG-specific runner for prompt optimization.
 
-This module orchestrates the complete optimization pipeline,
-coordinating the RAG engine, optimizer configuration, and results reporting.
+This module provides the integration between the RAG engine
+and the generic prompt optimization runner.
 """
 
 import logging
 import os
 
-from prompt_optimizer.model_clients import FunctionModelClient
-from prompt_optimizer.optimizer import PromptOptimizer
+from prompt_optimizer.runner import OptimizationRunner
 from prompt_optimizer.types import OptimizationResult
 
 from .config import create_optimizer_config
-from .connector import create_rag_test_function
-from .reporter import display_results, save_champion_prompt, save_optimization_report
+from .connector import RAGConnector
 
 logger = logging.getLogger(__name__)
 
 
 async def run_optimization() -> OptimizationResult | None:
     """
-    Run the complete prompt optimization pipeline.
+    Run the RAG engine prompt optimization pipeline.
 
     This function:
     1. Validates environment setup (API keys)
-    2. Initializes RAG engine test function
+    2. Initializes RAG engine connector
     3. Configures optimizer
-    4. Runs optimization pipeline
-    5. Displays and saves results
+    4. Runs optimization pipeline with reporting
 
     Returns:
         OptimizationResult if successful, None if setup validation fails
@@ -48,46 +45,25 @@ async def run_optimization() -> OptimizationResult | None:
         print()
         return None
 
-    # Initialize RAG engine test function
+    # Initialize RAG engine connector
     print("Initializing RAG engine...")
-    test_function = create_rag_test_function()
+    rag_connector = RAGConnector()
 
     # Create optimizer configuration with API key
     optimizer_config = create_optimizer_config(api_key=api_key)
 
-    print("Configuration:")
-    print(f"  Initial prompts: {optimizer_config.num_initial_prompts}")
-    print(f"  Quick tests: {optimizer_config.num_quick_tests}")
-    print(f"  Rigorous tests: {optimizer_config.num_rigorous_tests}")
-    print(f"  Model: {optimizer_config.generator_llm.model}")
-    print()
-
-    # Create task specification from config
-    task_spec = optimizer_config.task_spec
-    if task_spec is None:
-        raise ValueError("task_spec must be provided on the optimizer configuration.")
-
-    # Initialize optimizer
-    model_client = FunctionModelClient(test_function)
-    optimizer = PromptOptimizer(
-        model_client=model_client,
-        config=optimizer_config,
-    )
-
-    # Run optimization
-    print("\nStarting optimization pipeline...")
-    print("This will take 15-20 minutes with GPT-4o")
+    print(f"This will take 15-20 minutes with {optimizer_config.generator_llm.model}")
     print()
 
     try:
-        result = await optimizer.optimize()
-
-        # Display results
-        display_results(result)
-
-        # Save outputs
-        save_champion_prompt(result)
-        save_optimization_report(result, task_spec)
+        # Run optimization using the generic runner
+        runner = OptimizationRunner(
+            connector=rag_connector,
+            config=optimizer_config,
+            output_dir="prompt_optimizer/data",
+            verbose=True,
+        )
+        result = await runner.run()
 
         return result
 

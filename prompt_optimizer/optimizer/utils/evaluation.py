@@ -4,7 +4,7 @@ from agents import Runner
 
 from prompt_optimizer.agents.evaluator_agent import create_evaluator_agent
 from prompt_optimizer.config import OptimizerConfig
-from prompt_optimizer.model_clients import ModelClient
+from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer.utils.model_tester import test_target_model
 from prompt_optimizer.optimizer.utils.score_calculator import aggregate_prompt_score
 from prompt_optimizer.storage import Storage
@@ -22,7 +22,7 @@ async def evaluate_prompt(
     test_cases: list[TestCase],
     task_spec: TaskSpec,
     config: OptimizerConfig,
-    model_client: ModelClient,
+    model_client: BaseConnector,
     storage: Storage,
 ) -> float:
     """
@@ -33,7 +33,7 @@ async def evaluate_prompt(
         test_cases: Test cases to run
         task_spec: Task specification
         config: Optimizer configuration
-        model_client: Client for the target model
+        model_client: Connector for the target model
         storage: Storage instance for saving results
 
     Returns:

@@ -6,28 +6,21 @@ to achieve optimal AI behavior through a 3-stage pipeline:
 1. Quick Filter: Generate 15 prompts, test with 7 cases, select top 5
 2. Rigorous Testing: Test top 5 with 50 cases, select top 3
 3. Parallel Refinement: Refine top 3 in parallel tracks, select champion
+
+Public API:
+- BaseConnector: Abstract base class for implementing custom connectors
+- OpenAIConnector: Built-in connector for OpenAI models
+- OptimizerConfig: Configuration for the optimization pipeline
+- OptimizationRunner: Main runner interface for executing optimization
 """
 
-from prompt_optimizer.config import OptimizerConfig, TestDistribution
-from prompt_optimizer.model_clients import FunctionModelClient, ModelClient
-from prompt_optimizer.optimizer import PromptOptimizer
-from prompt_optimizer.types import (
-    EvaluationScore,
-    OptimizationResult,
-    PromptCandidate,
-    TaskSpec,
-    TestCase,
-)
+from prompt_optimizer.config import OptimizerConfig
+from prompt_optimizer.connectors import BaseConnector, OpenAIConnector
+from prompt_optimizer.runner import OptimizationRunner
 
 __all__ = [
-    "EvaluationScore",
-    "OptimizationResult",
-    "PromptCandidate",
-    "TaskSpec",
-    "TestCase",
+    "BaseConnector",
+    "OpenAIConnector",
     "OptimizerConfig",
-    "TestDistribution",
-    "FunctionModelClient",
-    "ModelClient",
-    "PromptOptimizer",
+    "OptimizationRunner",
 ]
