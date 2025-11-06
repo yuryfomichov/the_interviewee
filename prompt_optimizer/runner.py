@@ -61,19 +61,32 @@ class OptimizationRunner:
         if self.verbose:
             self._print_header()
 
-        # Prepare output directory before optimization starts
+        # Prepare temporary output directory before optimization starts
         # This allows intermediate reports to be saved during optimization
-        run_output_dir = self._prepare_run_directory(None)
-        self.last_run_dir = run_output_dir
+        temp_output_dir = self._prepare_run_directory(None)
 
         # Create optimizer with output directory for intermediate reports
         self.optimizer = PromptOptimizer(
             model_client=self.connector,
             config=self.config,
-            output_dir=str(run_output_dir),
+            output_dir=str(temp_output_dir),
         )
 
         result = await self.optimizer.optimize()
+
+        # Rename directory to use proper run_id now that we have it
+        if result.run_id is not None:
+            final_output_dir = self._prepare_run_directory(result.run_id)
+            if temp_output_dir != final_output_dir:
+                # Rename temp directory to final directory with run_id
+                temp_output_dir.rename(final_output_dir)
+                run_output_dir = final_output_dir
+            else:
+                run_output_dir = temp_output_dir
+        else:
+            run_output_dir = temp_output_dir
+
+        self.last_run_dir = run_output_dir
 
         if self.verbose:
             display_results(result)
