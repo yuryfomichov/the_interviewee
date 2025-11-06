@@ -15,6 +15,11 @@ class RunContext(BaseModel):
     # Input: Task specification
     task_spec: TaskSpec = Field(description="Task specification for optimization")
 
+    # Output directory for saving intermediate results
+    output_dir: str | None = Field(
+        default=None, description="Directory for saving intermediate reports during optimization"
+    )
+
     # Stage 1 output: Generated prompts
     initial_prompts: list[PromptCandidate] = Field(
         default_factory=list, description="All initially generated prompts"

@@ -38,6 +38,7 @@ class Storage:
                     average_score REAL,
                     iteration INTEGER DEFAULT 0,
                     track_id INTEGER,
+                    is_original_system_prompt INTEGER DEFAULT 0,
                     created_at TEXT NOT NULL
                 );
 
@@ -87,8 +88,9 @@ class Storage:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO prompts
-                (id, prompt_text, stage, strategy, average_score, iteration, track_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, prompt_text, stage, strategy, average_score, iteration, track_id,
+                 is_original_system_prompt, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     prompt.id,
@@ -98,6 +100,7 @@ class Storage:
                     prompt.average_score,
                     prompt.iteration,
                     prompt.track_id,
+                    1 if prompt.is_original_system_prompt else 0,
                     prompt.created_at.isoformat(),
                 ),
             )

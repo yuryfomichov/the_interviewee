@@ -1,5 +1,7 @@
 """Generate prompts stage: Create diverse initial prompt variations."""
 
+import uuid
+
 from agents import Runner
 
 from prompt_optimizer.agents.prompt_generator_agent import create_generator_agent
@@ -26,15 +28,42 @@ class GeneratePromptsStage(BaseStage):
         Returns:
             Updated context with initial_prompts populated
         """
-        self._print_progress(f"Generating {self.config.num_initial_prompts} diverse prompts...")
+        prompts = []
+
+        # Include original system prompt if provided
+        if context.task_spec.current_prompt:
+            self._print_progress("Including original system prompt for testing...")
+            original_prompt = PromptCandidate(
+                id=f"original_system_prompt_{uuid.uuid4().hex[:8]}",
+                prompt_text=context.task_spec.current_prompt,
+                stage="initial",
+                strategy="original_system_prompt",
+                is_original_system_prompt=True,
+            )
+            prompts.append(original_prompt)
+            self._print_progress("Added original system prompt to testing pipeline")
+
+        # Generate additional variations
+        num_to_generate = (
+            self.config.num_initial_prompts - 1
+            if context.task_spec.current_prompt
+            else self.config.num_initial_prompts
+        )
+
+        self._print_progress(f"Generating {num_to_generate} diverse prompt variations...")
 
         generator = create_generator_agent(
-            self.config.generator_llm, context.task_spec, self.config.num_initial_prompts
+            self.config.generator_llm, context.task_spec, num_to_generate
         )
         result = await Runner.run(generator, "Generate diverse system prompts")
-        prompts = self._parse_generated_prompts(result.final_output)
+        generated_prompts = self._parse_generated_prompts(result.final_output)
+        prompts.extend(generated_prompts)
 
-        self._print_progress(f"Generated {len(prompts)} prompt variations")
+        self._print_progress(
+            f"Generated {len(prompts)} total prompts "
+            f"({1 if context.task_spec.current_prompt else 0} original + "
+            f"{len(generated_prompts)} variations)"
+        )
 
         context.initial_prompts = prompts
         return context

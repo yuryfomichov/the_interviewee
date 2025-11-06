@@ -11,10 +11,13 @@ from pathlib import Path
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer import PromptOptimizer
-from prompt_optimizer.reporter import (
+from prompt_optimizer.reports import (
     display_results,
     save_champion_prompt,
+    save_champion_qa_results,
+    save_champion_questions,
     save_optimization_report,
+    save_original_prompt_rigorous_results,
 )
 from prompt_optimizer.types import OptimizationResult
 
@@ -47,10 +50,8 @@ class OptimizationRunner:
         if config.task_spec is None:
             raise ValueError("OptimizerConfig must have task_spec populated")
 
-        self.optimizer = PromptOptimizer(
-            model_client=connector,
-            config=config,
-        )
+        # Optimizer will be created in run() method with output_dir
+        self.optimizer = None
 
     async def run(self) -> OptimizationResult:
         """Run the optimization pipeline with reporting.
@@ -61,16 +62,28 @@ class OptimizationRunner:
         if self.verbose:
             self._print_header()
 
+        # Create optimizer (it will create the output directory with proper run_id)
+        self.optimizer = PromptOptimizer(
+            model_client=self.connector,
+            config=self.config,
+        )
+
         result = await self.optimizer.optimize()
 
-        run_output_dir = self._prepare_run_directory(result.run_id)
-        self.last_run_dir = run_output_dir
+        # Get output directory from result
+        run_output_dir = result.output_dir
+        self.last_run_dir = Path(run_output_dir) if run_output_dir else None
 
         if self.verbose:
             display_results(result)
 
-        save_champion_prompt(result, output_dir=str(run_output_dir))
-        save_optimization_report(result, self.config.task_spec, output_dir=str(run_output_dir))
+        # Save all final results to the directory created by orchestrator
+        if run_output_dir:
+            save_champion_prompt(result, output_dir=run_output_dir)
+            save_optimization_report(result, self.config.task_spec, output_dir=run_output_dir)
+            save_champion_questions(result, output_dir=run_output_dir)
+            save_champion_qa_results(result, output_dir=run_output_dir)
+            save_original_prompt_rigorous_results(result, output_dir=run_output_dir)
 
         return result
 

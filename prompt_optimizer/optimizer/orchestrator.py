@@ -96,11 +96,16 @@ class PromptOptimizer:
         start_time = time.time()
         run_id = self.storage.start_optimization_run(spec.task_description)
 
+        # Create run-specific output directory
+        run_output_dir = self.config.results_path / f"run-{run_id:04d}"
+        run_output_dir.mkdir(parents=True, exist_ok=True)
+
         self._print_progress("=== STARTING PROMPT OPTIMIZATION ===")
         self._print_progress(f"Task: {spec.task_description}")
+        self._print_progress(f"Output directory: {run_output_dir}")
 
         # Initialize context
-        context = RunContext(task_spec=spec)
+        context = RunContext(task_spec=spec, output_dir=str(run_output_dir))
 
         # Execute all stages sequentially, each updating the context
         for idx, stage in enumerate(self.stages):
@@ -123,8 +128,26 @@ class PromptOptimizer:
 
         self.storage.complete_optimization_run(run_id, champion.id, total_tests)
 
+        # Find original system prompt if it was included
+        original_prompt = next(
+            (p for p in context.initial_prompts if p.is_original_system_prompt), None
+        )
+
+        # Get all test results for the champion
+        champion_test_results = self.storage.get_prompt_evaluations(champion.id)
+
+        # Get original prompt results (already evaluated with rigorous tests in Stage 6)
+        original_rigorous_score = None
+        original_test_results = []
+        if original_prompt:
+            # Original prompt was already evaluated with rigorous tests in Stage 6
+            # (either as part of top_k or temporarily added for comparison)
+            original_rigorous_score = original_prompt.average_score
+            original_test_results = self.storage.get_prompt_evaluations(original_prompt.id)
+
         return OptimizationResult(
             run_id=run_id,
+            output_dir=str(run_output_dir),
             best_prompt=champion,
             all_tracks=context.refinement_tracks,
             initial_prompts=context.initial_prompts,
@@ -134,6 +157,10 @@ class PromptOptimizer:
             total_time_seconds=total_time,
             quick_tests=context.quick_tests,
             rigorous_tests=context.rigorous_tests,
+            original_system_prompt=original_prompt,
+            original_system_prompt_rigorous_score=original_rigorous_score,
+            original_system_prompt_test_results=original_test_results,
+            champion_test_results=champion_test_results,
         )
 
     def _print_progress(self, message: str, end: str = "\n") -> None:

@@ -91,7 +91,19 @@ class PromptCandidate(BaseModel):
     )
     iteration: int = Field(default=0, description="Refinement iteration number")
     track_id: int | None = Field(default=None, description="Refinement track number (0-2)")
+    is_original_system_prompt: bool = Field(
+        default=False, description="Whether this is the original system prompt being tested"
+    )
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class WeaknessAnalysis(BaseModel):
+    """Analysis of prompt weaknesses at a specific iteration."""
+
+    iteration: int
+    description: str
+    failed_test_ids: list[str]
+    failed_test_descriptions: list[str]
 
 
 class RefinementTrackResult(BaseModel):
@@ -103,12 +115,16 @@ class RefinementTrackResult(BaseModel):
     iterations: list[PromptCandidate]
     score_progression: list[float]
     improvement: float  # Final score - initial score
+    weaknesses_history: list[WeaknessAnalysis] = Field(
+        default_factory=list, description="Weaknesses identified at each iteration"
+    )
 
 
 class OptimizationResult(BaseModel):
     """Final results from the entire optimization process."""
 
     run_id: int | None = Field(default=None, description="Identifier for the storage run")
+    output_dir: str | None = Field(default=None, description="Directory where results were saved")
     best_prompt: PromptCandidate = Field(description="Champion prompt")
     all_tracks: list[RefinementTrackResult] = Field(description="Results from all 3 tracks")
     initial_prompts: list[PromptCandidate] = Field(description="All 15 initial prompts")
@@ -118,3 +134,15 @@ class OptimizationResult(BaseModel):
     total_time_seconds: float = Field(description="Total optimization time")
     quick_tests: list[TestCase] = Field(description="Quick evaluation test cases")
     rigorous_tests: list[TestCase] = Field(description="Rigorous evaluation test cases")
+    original_system_prompt: PromptCandidate | None = Field(
+        default=None, description="The original system prompt if provided"
+    )
+    original_system_prompt_rigorous_score: float | None = Field(
+        default=None, description="Original prompt score on rigorous tests (for fair comparison)"
+    )
+    original_system_prompt_test_results: list[TestResult] = Field(
+        default_factory=list, description="All rigorous test results for original prompt"
+    )
+    champion_test_results: list[TestResult] = Field(
+        default_factory=list, description="All test results for the champion prompt"
+    )
