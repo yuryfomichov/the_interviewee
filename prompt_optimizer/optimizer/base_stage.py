@@ -37,10 +37,38 @@ class BaseStage(ABC):
         self.model_client = model_client
         self._print_progress = progress_callback or (lambda msg: None)
 
-    @abstractmethod
     async def run(self, context: RunContext) -> RunContext:
         """
-        Execute the stage.
+        Execute the stage (dispatch to sync or async based on config).
+
+        Args:
+            context: Current run context with all pipeline state
+
+        Returns:
+            Updated run context with this stage's outputs
+        """
+        if self.config.parallel_execution:
+            return await self._run_async(context)
+        else:
+            return await self._run_sync(context)
+
+    @abstractmethod
+    async def _run_async(self, context: RunContext) -> RunContext:
+        """
+        Execute the stage in parallel/async mode.
+
+        Args:
+            context: Current run context with all pipeline state
+
+        Returns:
+            Updated run context with this stage's outputs
+        """
+        pass
+
+    @abstractmethod
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Execute the stage in sequential/sync mode.
 
         Args:
             context: Current run context with all pipeline state

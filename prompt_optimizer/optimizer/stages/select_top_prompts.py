@@ -25,9 +25,9 @@ class SelectTopPromptsStage(BaseStage):
         """Return the stage name."""
         return f"Select Top {self.top_n}"
 
-    async def run(self, context: RunContext) -> RunContext:
+    async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Select top N prompts by score.
+        Select top N prompts by score (async mode).
 
         Args:
             context: Run context with prompts
@@ -56,3 +56,16 @@ class SelectTopPromptsStage(BaseStage):
             context.top_m_prompts = top_prompts
 
         return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Select top N prompts by score (sync mode - same as async for this stage).
+
+        Args:
+            context: Run context with prompts
+
+        Returns:
+            Updated context with top_k_prompts or top_m_prompts populated
+        """
+        # This stage is purely computational, no difference between sync and async
+        return await self._run_async(context)

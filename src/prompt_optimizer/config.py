@@ -62,7 +62,7 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
     """
     return OptimizerConfig(
         # Stage: Quick Filter
-        num_initial_prompts=4,
+        num_initial_prompts=3,
         quick_test_distribution=TestDistribution(
             core=1,
             edge=1,
@@ -71,7 +71,7 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
             consistency=1,
             format=1,
         ),
-        top_k_advance=2,
+        top_k_advance=1,
         # Stage: Rigorous Testing
         rigorous_test_distribution=TestDistribution(
             core=2,
@@ -85,10 +85,10 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
         # Stage: Refinement
         max_iterations_per_track=3,
         # LLM models for each agent
-        generator_llm=LLMConfig(model="gpt-5"),
-        test_designer_llm=LLMConfig(model="gpt-5"),
-        evaluator_llm=LLMConfig(model="gpt-5"),
-        refiner_llm=LLMConfig(model="gpt-5"),
+        generator_llm=LLMConfig(model="gpt-5-nano"),
+        test_designer_llm=LLMConfig(model="gpt-5-nano"),
+        evaluator_llm=LLMConfig(model="gpt-5-nano"),
+        refiner_llm=LLMConfig(model="gpt-5-nano"),
         # Output
         storage_path="prompt_optimizer/data/optimizer.db",
         verbose=True,
@@ -96,4 +96,5 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
         openai_api_key=api_key,
         # Task Spec
         task_spec=create_task_spec(),
+        parallel_execution=True,
     )

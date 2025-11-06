@@ -27,9 +27,9 @@ class GenerateTestsStage(BaseStage):
         """Return the stage name."""
         return f"Generate {self.test_stage.capitalize()} Tests"
 
-    async def run(self, context: RunContext) -> RunContext:
+    async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Generate test cases.
+        Generate test cases (async mode).
 
         Args:
             context: Run context with task_spec
@@ -75,6 +75,19 @@ class GenerateTestsStage(BaseStage):
             context.rigorous_tests = tests
 
         return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Generate test cases (sync mode - same as async for this stage).
+
+        Args:
+            context: Run context with task_spec
+
+        Returns:
+            Updated context with quick_tests or rigorous_tests populated
+        """
+        # This stage doesn't benefit from parallel execution since it's a single agent call
+        return await self._run_async(context)
 
     def _parse_test_cases(self, agent_output) -> list[TestCase]:
         """Parse agent output into TestCase objects."""

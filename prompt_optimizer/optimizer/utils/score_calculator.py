@@ -21,7 +21,5 @@ def aggregate_prompt_score(evaluations: list[EvaluationScore]) -> float:
         return 0.0
 
     avg_score = sum(e.overall for e in evaluations) / len(evaluations)
-    logger.info(
-        f"Aggregated {len(evaluations)} evaluations: avg score = {avg_score:.2f}"
-    )
+    logger.info(f"Aggregated {len(evaluations)} evaluations: avg score = {avg_score:.2f}")
     return avg_score

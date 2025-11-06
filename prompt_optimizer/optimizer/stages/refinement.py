@@ -18,9 +18,9 @@ class RefinementStage(BaseStage):
     @property
     def name(self) -> str:
         """Return the stage name."""
-        return "Parallel Refinement"
+        return "Refinement"
 
-    async def run(self, context: RunContext) -> RunContext:
+    async def _run_async(self, context: RunContext) -> RunContext:
         """
         Refine top prompts in parallel tracks.
 
@@ -35,12 +35,33 @@ class RefinementStage(BaseStage):
 
         # Run tracks in parallel
         tasks = [
-            self._refinement_track(prompt, context, track_id=i)
-            for i, prompt in enumerate(prompts)
+            self._refinement_track(prompt, context, track_id=i) for i, prompt in enumerate(prompts)
         ]
         track_results = await asyncio.gather(*tasks)
 
         context.refinement_tracks = list(track_results)
+        return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Refine top prompts sequentially.
+
+        Args:
+            context: Run context with top_m_prompts and rigorous_tests
+
+        Returns:
+            Updated context with refinement_tracks populated
+        """
+        prompts = context.top_m_prompts
+        self._print_progress(f"Running {len(prompts)} refinement tracks sequentially...")
+
+        track_results = []
+        for i, prompt in enumerate(prompts):
+            self._print_progress(f"\nStarting refinement track {i + 1}/{len(prompts)}...")
+            result = await self._refinement_track(prompt, context, track_id=i)
+            track_results.append(result)
+
+        context.refinement_tracks = track_results
         return context
 
     async def _refinement_track(
@@ -93,7 +114,12 @@ class RefinementStage(BaseStage):
 
             # Re-evaluate
             new_score = await evaluate_prompt(
-                refined_prompt, rigorous_tests, task_spec, self.config, self.model_client, self.storage
+                refined_prompt,
+                rigorous_tests,
+                task_spec,
+                self.config,
+                self.model_client,
+                self.storage,
             )
             refined_prompt.average_score = new_score
             self.storage.save_prompt(refined_prompt)
@@ -156,7 +182,7 @@ class RefinementStage(BaseStage):
 
         weakness_description = (
             f"Found {len(failures)} weak test cases. "
-            f"Common issues: {', '.join(set(tr.evaluation.reasoning for tr in failures[:3]))}"
+            f"Common issues: {', '.join({tr.evaluation.reasoning for tr in failures[:3]})}"
         )
 
         return {

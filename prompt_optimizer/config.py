@@ -126,6 +126,12 @@ class OptimizerConfig(BaseModel):
         default="prompt_optimizer/data/optimizer.db", description="SQLite database path"
     )
 
+    # Execution mode
+    parallel_execution: bool = Field(
+        default=False,
+        description="Run stages in parallel mode (True) or sequential/sync mode (False)",
+    )
+
     # Progress reporting
     verbose: bool = Field(default=True, description="Print progress updates")
 

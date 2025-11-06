@@ -16,9 +16,9 @@ class GeneratePromptsStage(BaseStage):
         """Return the stage name."""
         return "Generate Prompts"
 
-    async def run(self, context: RunContext) -> RunContext:
+    async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Generate initial prompt variations.
+        Generate initial prompt variations (async mode).
 
         Args:
             context: Run context with task_spec
@@ -38,6 +38,19 @@ class GeneratePromptsStage(BaseStage):
 
         context.initial_prompts = prompts
         return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Generate initial prompt variations (sync mode - same as async for this stage).
+
+        Args:
+            context: Run context with task_spec
+
+        Returns:
+            Updated context with initial_prompts populated
+        """
+        # This stage doesn't benefit from parallel execution since it's a single agent call
+        return await self._run_async(context)
 
     def _parse_generated_prompts(self, agent_output) -> list[PromptCandidate]:
         """Parse agent output into PromptCandidate objects."""

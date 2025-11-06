@@ -26,9 +26,9 @@ class EvaluatePromptsStage(BaseStage):
         """Return the stage name."""
         return f"Evaluate ({self.stage_name.replace('_', ' ').title()})"
 
-    async def run(self, context: RunContext) -> RunContext:
+    async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Evaluate prompts against test cases.
+        Evaluate prompts against test cases in parallel.
 
         Args:
             context: Run context with prompts and tests
@@ -58,6 +58,43 @@ class EvaluatePromptsStage(BaseStage):
         scores = await asyncio.gather(*eval_tasks)
 
         for prompt, avg_score in zip(prompts, scores, strict=True):
+            prompt.average_score = avg_score
+            prompt.stage = self.stage_name
+            self.storage.save_prompt(prompt)
+
+        self._print_progress(
+            f"Evaluation complete (scores: {[f'{p.average_score:.2f}' for p in prompts[:5]]}...)"
+        )
+
+        return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Evaluate prompts against test cases sequentially.
+
+        Args:
+            context: Run context with prompts and tests
+
+        Returns:
+            Updated context with prompts having updated scores
+        """
+        # Determine which prompts and tests to use
+        if self.stage_name == "quick_filter":
+            prompts = context.initial_prompts
+            tests = context.quick_tests
+        else:  # rigorous
+            prompts = context.top_k_prompts
+            tests = context.rigorous_tests
+
+        self._print_progress(
+            f"Evaluating {len(prompts)} prompts × {len(tests)} tests (sequential)..."
+        )
+
+        for i, prompt in enumerate(prompts, 1):
+            self._print_progress(f"  Evaluating prompt {i}/{len(prompts)}...")
+            avg_score = await evaluate_prompt(
+                prompt, tests, context.task_spec, self.config, self.model_client, self.storage
+            )
             prompt.average_score = avg_score
             prompt.stage = self.stage_name
             self.storage.save_prompt(prompt)
