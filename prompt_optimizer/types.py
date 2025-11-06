@@ -91,7 +91,19 @@ class PromptCandidate(BaseModel):
     )
     iteration: int = Field(default=0, description="Refinement iteration number")
     track_id: int | None = Field(default=None, description="Refinement track number (0-2)")
+    is_original_system_prompt: bool = Field(
+        default=False, description="Whether this is the original system prompt being tested"
+    )
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class WeaknessAnalysis(BaseModel):
+    """Analysis of prompt weaknesses at a specific iteration."""
+
+    iteration: int
+    description: str
+    failed_test_ids: list[str]
+    failed_test_descriptions: list[str]
 
 
 class RefinementTrackResult(BaseModel):
@@ -103,6 +115,9 @@ class RefinementTrackResult(BaseModel):
     iterations: list[PromptCandidate]
     score_progression: list[float]
     improvement: float  # Final score - initial score
+    weaknesses_history: list[WeaknessAnalysis] = Field(
+        default_factory=list, description="Weaknesses identified at each iteration"
+    )
 
 
 class OptimizationResult(BaseModel):
@@ -118,3 +133,9 @@ class OptimizationResult(BaseModel):
     total_time_seconds: float = Field(description="Total optimization time")
     quick_tests: list[TestCase] = Field(description="Quick evaluation test cases")
     rigorous_tests: list[TestCase] = Field(description="Rigorous evaluation test cases")
+    original_system_prompt: PromptCandidate | None = Field(
+        default=None, description="The original system prompt if provided"
+    )
+    champion_test_results: list[TestResult] = Field(
+        default_factory=list, description="All test results for the champion prompt"
+    )

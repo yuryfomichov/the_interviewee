@@ -9,7 +9,7 @@ from prompt_optimizer.agents.refiner_agent import RefinedPromptOutput, create_re
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
-from prompt_optimizer.types import PromptCandidate, RefinementTrackResult
+from prompt_optimizer.types import PromptCandidate, RefinementTrackResult, WeaknessAnalysis
 
 
 class RefinementStage(BaseStage):
@@ -85,6 +85,7 @@ class RefinementStage(BaseStage):
         no_improvement_count = 0
         iterations = [current_prompt]
         score_progression = [best_score]
+        weaknesses_history = []
 
         self._print_progress(f"\n  Track {track_id}: Starting (score={best_score:.2f})")
 
@@ -92,7 +93,17 @@ class RefinementStage(BaseStage):
             # Analyze weaknesses
             weaknesses = await self._analyze_weaknesses(current_prompt)
             failed_tests = weaknesses.get("failed_tests", [])
+            failed_test_ids = weaknesses.get("failed_test_ids", [])
             weakness_description = weaknesses.get("description", "")
+
+            # Store weakness analysis
+            weakness_analysis = WeaknessAnalysis(
+                iteration=iteration - 1,  # The iteration where this weakness was found
+                description=weakness_description,
+                failed_test_ids=failed_test_ids,
+                failed_test_descriptions=failed_tests,
+            )
+            weaknesses_history.append(weakness_analysis)
 
             # Generate refinement
             refiner = create_refiner_agent(
@@ -169,6 +180,7 @@ class RefinementStage(BaseStage):
             iterations=iterations,
             score_progression=score_progression,
             improvement=final_improvement,
+            weaknesses_history=weaknesses_history,
         )
 
     async def _analyze_weaknesses(self, prompt: PromptCandidate) -> dict:
@@ -180,9 +192,14 @@ class RefinementStage(BaseStage):
         failures = [tr for tr in test_results if tr.evaluation.overall < 7.0]
 
         if not failures:
-            return {"description": "No significant weaknesses found", "failed_tests": []}
+            return {
+                "description": "No significant weaknesses found",
+                "failed_tests": [],
+                "failed_test_ids": [],
+            }
 
         # Summarize failure patterns
+        failed_test_ids = [tr.test_case_id for tr in failures]
         failed_test_descriptions = [
             f"Test {tr.test_case_id}: {tr.evaluation.reasoning}" for tr in failures[:5]
         ]
@@ -195,6 +212,7 @@ class RefinementStage(BaseStage):
         return {
             "description": weakness_description,
             "failed_tests": failed_test_descriptions,
+            "failed_test_ids": failed_test_ids,
         }
 
     def _parse_refined_prompt(self, agent_output: RefinedPromptOutput) -> str:

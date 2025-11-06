@@ -123,6 +123,14 @@ class PromptOptimizer:
 
         self.storage.complete_optimization_run(run_id, champion.id, total_tests)
 
+        # Find original system prompt if it was included
+        original_prompt = next(
+            (p for p in context.initial_prompts if p.is_original_system_prompt), None
+        )
+
+        # Get all test results for the champion
+        champion_test_results = self.storage.get_prompt_evaluations(champion.id)
+
         return OptimizationResult(
             run_id=run_id,
             best_prompt=champion,
@@ -134,6 +142,8 @@ class PromptOptimizer:
             total_time_seconds=total_time,
             quick_tests=context.quick_tests,
             rigorous_tests=context.rigorous_tests,
+            original_system_prompt=original_prompt,
+            champion_test_results=champion_test_results,
         )
 
     def _print_progress(self, message: str, end: str = "\n") -> None:

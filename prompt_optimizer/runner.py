@@ -14,6 +14,8 @@ from prompt_optimizer.optimizer import PromptOptimizer
 from prompt_optimizer.reporter import (
     display_results,
     save_champion_prompt,
+    save_champion_qa_results,
+    save_champion_questions,
     save_optimization_report,
 )
 from prompt_optimizer.types import OptimizationResult
@@ -69,8 +71,11 @@ class OptimizationRunner:
         if self.verbose:
             display_results(result)
 
+        # Save all results
         save_champion_prompt(result, output_dir=str(run_output_dir))
         save_optimization_report(result, self.config.task_spec, output_dir=str(run_output_dir))
+        save_champion_questions(result, output_dir=str(run_output_dir))
+        save_champion_qa_results(result, output_dir=str(run_output_dir))
 
         return result
 
