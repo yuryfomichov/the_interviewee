@@ -75,8 +75,8 @@ async def save_prompts_json(result: OptimizationResult, output_dir: str) -> Path
             "id": result.original_system_prompt.id,
             "track_id": result.original_system_prompt.track_id,
             "prompt_text": result.original_system_prompt.prompt_text,
-            "quick_score": result.original_system_prompt.average_score,
-            "rigorous_score": result.original_system_prompt_rigorous_score,
+            "quick_score": result.original_system_prompt.quick_score,
+            "rigorous_score": result.original_system_prompt.rigorous_score,
         }
 
     # Write to JSON file with pretty formatting

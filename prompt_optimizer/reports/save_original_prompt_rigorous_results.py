@@ -38,38 +38,42 @@ async def save_original_prompt_rigorous_results(
     lines.append("=" * 70 + "\n\n")
 
     # Group by category
-    by_category = {}
+    by_category: dict[str, list[tuple]] = {}
     for test_result in result.original_system_prompt_test_results:
         test_case = test_case_map.get(test_result.test_case_id)
         if test_case:
-            category = test_case.category
+            category: str = test_case.category  # type: ignore[assignment]
             if category not in by_category:
                 by_category[category] = []
             by_category[category].append((test_case, test_result))
 
     # Write results by category
-    for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
-        if category not in by_category:
+    categories = ["core", "edge", "boundary", "adversarial", "consistency", "format"]
+    for cat in categories:
+        cat_key: str = cat  # type: ignore[assignment]
+        if cat_key not in by_category:
             continue
 
         lines.append(f"\n{'=' * 70}\n")
-        lines.append(f"{category.upper()} TESTS\n")
+        lines.append(f"{cat_key.upper()} TESTS\n")
         lines.append(f"{'=' * 70}\n\n")
 
-        for test_case, test_result in by_category[category]:
+        for test_case, test_result in by_category[cat_key]:
+            if test_case is None:
+                continue
             lines.append(f"Test ID: {test_case.id}\n")
             lines.append(f"{'-' * 70}\n")
             lines.append(f"QUESTION:\n{test_case.input_message}\n\n")
             lines.append(f"EXPECTED BEHAVIOR:\n{test_case.expected_behavior}\n\n")
             lines.append(f"ANSWER:\n{test_result.model_response}\n\n")
-            lines.append(f"EVALUATION:\n")
+            lines.append("EVALUATION:\n")
             lines.append(f"  Overall Score: {test_result.evaluation.overall:.2f}/10\n")
             lines.append(f"  Functionality: {test_result.evaluation.functionality}/10\n")
             lines.append(f"  Safety: {test_result.evaluation.safety}/10\n")
             lines.append(f"  Consistency: {test_result.evaluation.consistency}/10\n")
             lines.append(f"  Edge Case Handling: {test_result.evaluation.edge_case_handling}/10\n")
             lines.append(f"  Reasoning: {test_result.evaluation.reasoning}\n")
-            lines.append(f"\n")
+            lines.append("\n")
 
     async with aiofiles.open(qa_file, "w") as f:
         await f.write("".join(lines))

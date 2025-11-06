@@ -84,9 +84,8 @@ class ReportingStage(BaseStage):
         original_rigorous_score = None
         original_test_results = []
         if original_prompt:
-            # Original prompt was already evaluated with rigorous tests in Stage 6
-            # (either as part of top_k or temporarily added for comparison)
-            original_rigorous_score = original_prompt.average_score
+            # Use the dedicated rigorous_score field to get the rigorous test score
+            original_rigorous_score = original_prompt.rigorous_score
             original_test_results = self.storage.get_prompt_evaluations(original_prompt.id)
 
         # Create the optimization result

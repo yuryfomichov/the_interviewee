@@ -39,20 +39,27 @@ async def save_optimization_report(
         lines.append("\n" + "=" * 70 + "\n")
         lines.append("ORIGINAL SYSTEM PROMPT PERFORMANCE (RIGOROUS TESTS)\n")
         lines.append("=" * 70 + "\n")
-        lines.append(f"Rigorous Test Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
+        lines.append(
+            f"Rigorous Test Score: {result.original_system_prompt_rigorous_score:.2f}/10\n"
+        )
         lines.append(
             f"Status: {'Advanced to refinement' if result.original_system_prompt in result.top_m_prompts else 'Filtered out after quick tests'}\n"
         )
-        improvement = (
-            result.best_prompt.average_score
-            - result.original_system_prompt_rigorous_score
-        )
-        improvement_pct = (improvement / result.original_system_prompt_rigorous_score * 100)
+        if (
+            result.original_system_prompt_rigorous_score is not None
+            and result.best_prompt.average_score is not None
+        ):
+            improvement = (
+                result.best_prompt.average_score - result.original_system_prompt_rigorous_score
+            )
+            improvement_pct = improvement / result.original_system_prompt_rigorous_score * 100
+        else:
+            improvement = 0.0
+            improvement_pct = 0.0
+        lines.append(f"Improvement over original: {improvement:+.2f} ({improvement_pct:+.1f}%)\n")
         lines.append(
-            f"Improvement over original: {improvement:+.2f} "
-            f"({improvement_pct:+.1f}%)\n"
+            f"\nNote: Both scores based on {len(result.rigorous_tests)} rigorous tests for fair comparison.\n"
         )
-        lines.append(f"\nNote: Both scores based on {len(result.rigorous_tests)} rigorous tests for fair comparison.\n")
 
     lines.append("\n" + "=" * 70 + "\n")
     lines.append("TRACK RESULTS\n")
@@ -69,12 +76,12 @@ async def save_optimization_report(
 
         # Weaknesses identified during refinement
         if track.weaknesses_history:
-            lines.append(f"\n  Weaknesses Identified:\n")
+            lines.append("\n  Weaknesses Identified:\n")
             for weakness in track.weaknesses_history:
                 lines.append(f"    Iteration {weakness.iteration}:\n")
                 lines.append(f"      {weakness.description}\n")
                 if weakness.failed_test_descriptions:
-                    lines.append(f"      Failed tests:\n")
+                    lines.append("      Failed tests:\n")
                     for test_desc in weakness.failed_test_descriptions[:3]:
                         lines.append(f"        - {test_desc}\n")
 

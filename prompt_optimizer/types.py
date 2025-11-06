@@ -87,7 +87,13 @@ class PromptCandidate(BaseModel):
         default=None, description="Generation strategy (e.g., 'structured', 'conversational')"
     )
     average_score: float | None = Field(
-        default=None, description="Average evaluation score across all tests"
+        default=None, description="Average evaluation score across all tests (latest stage)"
+    )
+    quick_score: float | None = Field(
+        default=None, description="Quick filter evaluation score (preserved for original prompt)"
+    )
+    rigorous_score: float | None = Field(
+        default=None, description="Rigorous evaluation score (preserved for original prompt)"
     )
     iteration: int = Field(default=0, description="Refinement iteration number")
     track_id: int | None = Field(default=None, description="Refinement track number (0-2)")

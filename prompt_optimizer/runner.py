@@ -43,7 +43,7 @@ class OptimizationRunner:
             raise ValueError("OptimizerConfig must have task_spec populated")
 
         # Optimizer will be created in run() method with output_dir
-        self.optimizer = None
+        self.optimizer: PromptOptimizer | None = None
 
     async def run(self) -> tuple[OptimizationResult, Path | None]:
         """Run the optimization pipeline with reporting.

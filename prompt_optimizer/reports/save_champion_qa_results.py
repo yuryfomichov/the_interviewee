@@ -34,7 +34,7 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
     lines.append("=" * 70 + "\n\n")
 
     # Group by category
-    by_category = {}
+    by_category: dict[str, list[tuple]] = {}
     for test_result in result.champion_test_results:
         test_case = test_case_map.get(test_result.test_case_id)
         if test_case:
@@ -44,15 +44,17 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
             by_category[category].append((test_case, test_result))
 
     # Write results by category
-    for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
-        if category not in by_category:
+    categories = ["core", "edge", "boundary", "adversarial", "consistency", "format"]
+    for cat in categories:
+        cat_key: str = cat  # type: ignore[assignment]
+        if cat_key not in by_category:
             continue
 
         lines.append(f"\n{'=' * 70}\n")
-        lines.append(f"{category.upper()} TESTS\n")
+        lines.append(f"{cat_key.upper()} TESTS\n")
         lines.append(f"{'=' * 70}\n\n")
 
-        for test_case, test_result in by_category[category]:
+        for test_case, test_result in by_category[cat_key]:
             lines.append(f"Test ID: {test_case.id}\n")
             lines.append(f"{'-' * 70}\n")
             lines.append(f"QUESTION:\n{test_case.input_message}\n\n")
