@@ -13,6 +13,7 @@ from prompt_optimizer.optimizer.stages import (
     GenerateTestsStage,
     RefinementStage,
     ReportingStage,
+    SaveReportsStage,
     SelectTopPromptsStage,
 )
 from prompt_optimizer.storage import Storage
@@ -83,8 +84,10 @@ class PromptOptimizer:
             SelectTopPromptsStage(self.config.top_m_refine, "rigorous", **stage_kwargs),
             # Stage 8: Parallel refinement
             RefinementStage(**stage_kwargs),
-            # Stage 9: Collect results and report
+            # Stage 9: Prepare report
             ReportingStage(**stage_kwargs),
+            # Stage 10: Save reports to disk
+            SaveReportsStage(**stage_kwargs),
         ]
 
     async def optimize(self) -> OptimizationResult:

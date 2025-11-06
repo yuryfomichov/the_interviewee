@@ -13,7 +13,7 @@ class ReportingStage(BaseStage):
     @property
     def name(self) -> str:
         """Return the stage name."""
-        return "Collect Results & Report"
+        return "Prepare Report"
 
     async def _run_async(self, context: RunContext) -> RunContext:
         """

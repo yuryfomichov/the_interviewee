@@ -11,14 +11,7 @@ from pathlib import Path
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer import PromptOptimizer
-from prompt_optimizer.reports import (
-    display_results,
-    save_champion_prompt,
-    save_champion_qa_results,
-    save_champion_questions,
-    save_optimization_report,
-    save_original_prompt_rigorous_results,
-)
+from prompt_optimizer.reports import display_results
 from prompt_optimizer.types import OptimizationResult
 
 logger = logging.getLogger(__name__)
@@ -77,13 +70,7 @@ class OptimizationRunner:
         if self.verbose:
             display_results(result)
 
-        # Save all final results to the directory created by orchestrator
-        if run_output_dir:
-            save_champion_prompt(result, output_dir=run_output_dir)
-            save_optimization_report(result, self.config.task_spec, output_dir=run_output_dir)
-            save_champion_questions(result, output_dir=run_output_dir)
-            save_champion_qa_results(result, output_dir=run_output_dir)
-            save_original_prompt_rigorous_results(result, output_dir=run_output_dir)
+        # Reports are now saved by Stage 10 (SaveReportsStage) in the optimizer pipeline
 
         return result
 

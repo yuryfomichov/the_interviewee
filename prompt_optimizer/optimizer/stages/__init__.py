@@ -5,6 +5,7 @@ from prompt_optimizer.optimizer.stages.generate_prompts import GeneratePromptsSt
 from prompt_optimizer.optimizer.stages.generate_tests import GenerateTestsStage
 from prompt_optimizer.optimizer.stages.refinement import RefinementStage
 from prompt_optimizer.optimizer.stages.reporting import ReportingStage
+from prompt_optimizer.optimizer.stages.save_reports import SaveReportsStage
 from prompt_optimizer.optimizer.stages.select_top_prompts import SelectTopPromptsStage
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "SelectTopPromptsStage",
     "RefinementStage",
     "ReportingStage",
+    "SaveReportsStage",
 ]
