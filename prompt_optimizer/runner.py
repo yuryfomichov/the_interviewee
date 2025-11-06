@@ -49,10 +49,8 @@ class OptimizationRunner:
         if config.task_spec is None:
             raise ValueError("OptimizerConfig must have task_spec populated")
 
-        self.optimizer = PromptOptimizer(
-            model_client=connector,
-            config=config,
-        )
+        # Optimizer will be created in run() method with output_dir
+        self.optimizer = None
 
     async def run(self) -> OptimizationResult:
         """Run the optimization pipeline with reporting.
@@ -63,15 +61,24 @@ class OptimizationRunner:
         if self.verbose:
             self._print_header()
 
-        result = await self.optimizer.optimize()
-
-        run_output_dir = self._prepare_run_directory(result.run_id)
+        # Prepare output directory before optimization starts
+        # This allows intermediate reports to be saved during optimization
+        run_output_dir = self._prepare_run_directory(None)
         self.last_run_dir = run_output_dir
+
+        # Create optimizer with output directory for intermediate reports
+        self.optimizer = PromptOptimizer(
+            model_client=self.connector,
+            config=self.config,
+            output_dir=str(run_output_dir),
+        )
+
+        result = await self.optimizer.optimize()
 
         if self.verbose:
             display_results(result)
 
-        # Save all results
+        # Save all final results
         save_champion_prompt(result, output_dir=str(run_output_dir))
         save_optimization_report(result, self.config.task_spec, output_dir=str(run_output_dir))
         save_champion_questions(result, output_dir=str(run_output_dir))

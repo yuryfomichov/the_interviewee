@@ -14,6 +14,7 @@ from prompt_optimizer.optimizer.stages import (
     RefinementStage,
     SelectTopPromptsStage,
 )
+from prompt_optimizer.reporter import save_original_prompt_quick_report
 from prompt_optimizer.storage import Storage
 from prompt_optimizer.types import OptimizationResult
 
@@ -28,6 +29,7 @@ class PromptOptimizer:
         model_client,
         config: OptimizerConfig | None = None,
         storage: Storage | None = None,
+        output_dir: str | None = None,
     ):
         """
         Initialize the optimizer.
@@ -36,12 +38,14 @@ class PromptOptimizer:
             model_client: Client for testing the target model.
             config: Optimizer configuration with a populated task_spec.
             storage: Storage instance (creates new if None).
+            output_dir: Directory for saving intermediate reports (optional).
         """
         self.model_client = model_client
         if config is None:
             raise ValueError("OptimizerConfig with task_spec must be provided.")
         self.config = config
         self.storage = storage or Storage(self.config.storage_path)
+        self.output_dir = output_dir
 
         # Set OpenAI API key in environment if provided in config
         if self.config.openai_api_key:
@@ -106,6 +110,24 @@ class PromptOptimizer:
         for idx, stage in enumerate(self.stages):
             self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
             context = await stage.run(context)
+
+            # After Stage 4 (Select Top K after quick filter), save original prompt report
+            if idx == 3 and self.output_dir:  # Stage 4 is index 3 (0-based)
+                original_prompt = next(
+                    (p for p in context.initial_prompts if p.is_original_system_prompt), None
+                )
+                if original_prompt:
+                    self._print_progress(
+                        "\nSaving original prompt quick test report..."
+                    )
+                    save_original_prompt_quick_report(
+                        original_prompt=original_prompt,
+                        quick_tests=context.quick_tests,
+                        initial_prompts=context.initial_prompts,
+                        top_k_prompts=context.top_k_prompts,
+                        storage=self.storage,
+                        output_dir=self.output_dir,
+                    )
 
         # Extract results from context
         champion = max(
