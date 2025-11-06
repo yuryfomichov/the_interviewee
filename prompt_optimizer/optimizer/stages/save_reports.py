@@ -1,5 +1,7 @@
 """Save reports stage: Save all optimization reports to disk."""
 
+import asyncio
+
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.reports import (
@@ -23,7 +25,7 @@ class SaveReportsStage(BaseStage):
 
     async def _run_async(self, context: RunContext) -> RunContext:
         """
-        Save all reports to disk (async mode).
+        Save all reports to disk concurrently (async mode).
 
         Args:
             context: Run context with optimization_result
@@ -31,34 +33,8 @@ class SaveReportsStage(BaseStage):
         Returns:
             Unchanged context (reports saved to disk)
         """
-        return await self._save_reports(context)
-
-    async def _run_sync(self, context: RunContext) -> RunContext:
-        """
-        Save all reports to disk (sync mode).
-
-        Args:
-            context: Run context with optimization_result
-
-        Returns:
-            Unchanged context (reports saved to disk)
-        """
-        return await self._save_reports(context)
-
-    async def _save_reports(self, context: RunContext) -> RunContext:
-        """
-        Save all reports to disk.
-
-        Args:
-            context: Run context with optimization_result
-
-        Returns:
-            Unchanged context (reports saved to disk)
-        """
-        # Validate we have everything we need
         if context.optimization_result is None:
             raise ValueError("optimization_result must be set in context")
-
         if context.output_dir is None:
             raise ValueError("output_dir must be set in context")
 
@@ -67,7 +43,41 @@ class SaveReportsStage(BaseStage):
 
         self._print_progress("\nSaving final reports...")
 
-        # Save all reports
+        # Save all reports concurrently using thread pool
+        await asyncio.gather(
+            asyncio.to_thread(save_champion_prompt, result, output_dir),
+            asyncio.to_thread(save_optimization_report, result, context.task_spec, output_dir),
+            asyncio.to_thread(save_champion_questions, result, output_dir),
+            asyncio.to_thread(save_champion_qa_results, result, output_dir),
+            asyncio.to_thread(save_original_prompt_rigorous_results, result, output_dir),
+            asyncio.to_thread(save_testcases_json, result, output_dir),
+            asyncio.to_thread(save_prompts_json, result, output_dir),
+        )
+
+        self._print_progress("All reports saved successfully.")
+        return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Save all reports to disk sequentially (sync mode).
+
+        Args:
+            context: Run context with optimization_result
+
+        Returns:
+            Unchanged context (reports saved to disk)
+        """
+        if context.optimization_result is None:
+            raise ValueError("optimization_result must be set in context")
+        if context.output_dir is None:
+            raise ValueError("output_dir must be set in context")
+
+        result = context.optimization_result
+        output_dir = context.output_dir
+
+        self._print_progress("\nSaving final reports...")
+
+        # Save all reports sequentially
         save_champion_prompt(result, output_dir=output_dir)
         save_optimization_report(result, context.task_spec, output_dir=output_dir)
         save_champion_questions(result, output_dir=output_dir)
@@ -77,5 +87,4 @@ class SaveReportsStage(BaseStage):
         save_prompts_json(result, output_dir=output_dir)
 
         self._print_progress("All reports saved successfully.")
-
         return context
