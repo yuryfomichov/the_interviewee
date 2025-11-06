@@ -2,7 +2,10 @@
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.reports import save_original_prompt_quick_report
+from prompt_optimizer.reports import (
+    save_original_prompt_quick_report,
+    save_original_prompt_rigorous_report,
+)
 
 
 class SelectTopPromptsStage(BaseStage):
@@ -71,6 +74,22 @@ class SelectTopPromptsStage(BaseStage):
                     )
         else:  # rigorous
             context.top_m_prompts = top_prompts
+
+            # Save original prompt rigorous test report if available
+            if context.output_dir:
+                original_prompt = next(
+                    (p for p in context.top_k_prompts if p.is_original_system_prompt), None
+                )
+                if original_prompt:
+                    self._print_progress("\nSaving original prompt rigorous test report...")
+                    save_original_prompt_rigorous_report(
+                        original_prompt=original_prompt,
+                        rigorous_tests=context.rigorous_tests,
+                        top_k_prompts=context.top_k_prompts,
+                        top_m_prompts=context.top_m_prompts,
+                        storage=self.storage,
+                        output_dir=context.output_dir,
+                    )
 
         return context
 
