@@ -82,7 +82,18 @@ class OptimizationRunner:
         print(f"  Initial prompts: {self.config.num_initial_prompts}")
         print(f"  Quick tests: {self.config.num_quick_tests}")
         print(f"  Rigorous tests: {self.config.num_rigorous_tests}")
-        print(f"  Model: {self.config.generator_llm.model}")
+        print("  Models:")
+        print(f"    Generator: {self.config.generator_llm.model}")
+        print(f"    Test designer: {self.config.test_designer_llm.model}")
+        print(f"    Evaluator: {self.config.evaluator_llm.model}")
+        print(f"    Refiner: {self.config.refiner_llm.model}")
+        if self.config.parallel_execution:
+            print(
+                f"  Parallel execution: enabled "
+                f"(max concurrent evaluations: {self.config.max_concurrent_evaluations})"
+            )
+        else:
+            print("  Parallel execution: disabled")
         print()
         print("Starting optimization...")
         print()

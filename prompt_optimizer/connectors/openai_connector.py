@@ -24,28 +24,22 @@ class OpenAIConnector(BaseConnector):
         logger.info(f"OpenAIConnector initialized with model {model}")
 
     async def test_prompt(self, system_prompt: str, message: str) -> str:
-        """Test via OpenAI API (async).
+        """Test via OpenAI Responses API (async).
 
         Args:
-            system_prompt: System prompt to use
-            message: User message
+            system_prompt: System prompt to use (passed as 'instructions')
+            message: User message (passed as 'input')
 
         Returns:
             Model response
         """
         try:
-            # Using the async API
-            response = await self.client.chat.completions.with_raw_response.create(
+            response = await self.client.responses.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message},
-                ],
-                temperature=0.7,
+                instructions=system_prompt,
+                input=message,
             )
-            # Parse the response
-            completion = response.parse()
-            return completion.choices[0].message.content or ""
+            return response.output_text or ""
         except Exception as e:
-            logger.error(f"OpenAI API call failed: {e}")
+            logger.error(f"OpenAI Responses API call failed: {e}")
             raise
