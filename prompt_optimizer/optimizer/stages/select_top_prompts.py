@@ -2,6 +2,7 @@
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
+from prompt_optimizer.reporter import save_original_prompt_quick_report
 
 
 class SelectTopPromptsStage(BaseStage):
@@ -52,6 +53,22 @@ class SelectTopPromptsStage(BaseStage):
         # Update context
         if self.selection_type == "quick":
             context.top_k_prompts = top_prompts
+
+            # Save original prompt quick test report if available
+            if self.output_dir:
+                original_prompt = next(
+                    (p for p in context.initial_prompts if p.is_original_system_prompt), None
+                )
+                if original_prompt:
+                    self._print_progress("\nSaving original prompt quick test report...")
+                    save_original_prompt_quick_report(
+                        original_prompt=original_prompt,
+                        quick_tests=context.quick_tests,
+                        initial_prompts=context.initial_prompts,
+                        top_k_prompts=context.top_k_prompts,
+                        storage=self.storage,
+                        output_dir=self.output_dir,
+                    )
         else:  # rigorous
             context.top_m_prompts = top_prompts
 

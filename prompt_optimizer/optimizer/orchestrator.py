@@ -14,7 +14,6 @@ from prompt_optimizer.optimizer.stages import (
     RefinementStage,
     SelectTopPromptsStage,
 )
-from prompt_optimizer.reporter import save_original_prompt_quick_report
 from prompt_optimizer.storage import Storage
 from prompt_optimizer.types import OptimizationResult
 
@@ -67,6 +66,7 @@ class PromptOptimizer:
             "storage": self.storage,
             "model_client": self.model_client,
             "progress_callback": self._print_progress,
+            "output_dir": self.output_dir,
         }
 
         return [
@@ -110,24 +110,6 @@ class PromptOptimizer:
         for idx, stage in enumerate(self.stages):
             self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
             context = await stage.run(context)
-
-            # After Stage 4 (Select Top K after quick filter), save original prompt report
-            if idx == 3 and self.output_dir:  # Stage 4 is index 3 (0-based)
-                original_prompt = next(
-                    (p for p in context.initial_prompts if p.is_original_system_prompt), None
-                )
-                if original_prompt:
-                    self._print_progress(
-                        "\nSaving original prompt quick test report..."
-                    )
-                    save_original_prompt_quick_report(
-                        original_prompt=original_prompt,
-                        quick_tests=context.quick_tests,
-                        initial_prompts=context.initial_prompts,
-                        top_k_prompts=context.top_k_prompts,
-                        storage=self.storage,
-                        output_dir=self.output_dir,
-                    )
 
         # Extract results from context
         champion = max(
