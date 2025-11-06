@@ -2,7 +2,10 @@
 
 from agents import Runner
 
-from prompt_optimizer.agents.test_designer_agent import create_test_designer_agent
+from prompt_optimizer.agents.test_designer_agent import (
+    TestCasesOutput,
+    create_test_designer_agent,
+)
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.types import TestCase
@@ -89,6 +92,6 @@ class GenerateTestsStage(BaseStage):
         # This stage doesn't benefit from parallel execution since it's a single agent call
         return await self._run_async(context)
 
-    def _parse_test_cases(self, agent_output) -> list[TestCase]:
+    def _parse_test_cases(self, agent_output: TestCasesOutput) -> list[TestCase]:
         """Parse agent output into TestCase objects."""
         return agent_output.test_cases

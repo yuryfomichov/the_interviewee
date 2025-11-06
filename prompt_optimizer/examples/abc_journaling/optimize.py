@@ -68,17 +68,19 @@ async def main() -> None:
         verbose=True,
     )
 
-    result = await runner.run()
+    result, last_run_dir = await runner.run()
 
     print()
     print("=" * 70)
     print("OPTIMIZATION COMPLETE")
     print("=" * 70)
-    print(f"\nChampion score: {result.best_prompt.average_score:.2f}")
+    average_score = result.best_prompt.average_score
+    if average_score is not None:
+        print(f"\nChampion score: {average_score:.2f}")
     print(f"Champion prompt ID: {result.best_prompt.id}")
     if result.best_prompt.track_id is not None:
         print(f"Refinement track: {result.best_prompt.track_id}")
-    results_dir = runner.last_run_dir or output_dir
+    results_dir = last_run_dir or output_dir
     print(f"\nResults saved in: {results_dir}")
     print()
 

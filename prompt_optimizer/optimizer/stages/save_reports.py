@@ -1,0 +1,90 @@
+"""Save reports stage: Save all optimization reports to disk."""
+
+import asyncio
+
+from prompt_optimizer.optimizer.base_stage import BaseStage
+from prompt_optimizer.optimizer.context import RunContext
+from prompt_optimizer.reports import (
+    save_champion_prompt,
+    save_champion_qa_results,
+    save_champion_questions,
+    save_optimization_report,
+    save_original_prompt_rigorous_results,
+    save_prompts_json,
+    save_testcases_json,
+)
+
+
+class SaveReportsStage(BaseStage):
+    """Final stage to save all optimization reports to disk."""
+
+    @property
+    def name(self) -> str:
+        """Return the stage name."""
+        return "Save Reports"
+
+    async def _run_async(self, context: RunContext) -> RunContext:
+        """
+        Save all reports to disk concurrently (async mode).
+
+        Args:
+            context: Run context with optimization_result
+
+        Returns:
+            Unchanged context (reports saved to disk)
+        """
+        if context.optimization_result is None:
+            raise ValueError("optimization_result must be set in context")
+        if context.output_dir is None:
+            raise ValueError("output_dir must be set in context")
+
+        result = context.optimization_result
+        output_dir = context.output_dir
+
+        self._print_progress("\nSaving final reports...")
+
+        # Save all reports concurrently
+        await asyncio.gather(
+            save_champion_prompt(result, output_dir),
+            save_optimization_report(result, context.task_spec, output_dir),
+            save_champion_questions(result, output_dir),
+            save_champion_qa_results(result, output_dir),
+            save_original_prompt_rigorous_results(result, output_dir),
+            save_testcases_json(result, output_dir),
+            save_prompts_json(result, output_dir),
+        )
+
+        self._print_progress("All reports saved successfully.")
+        return context
+
+    async def _run_sync(self, context: RunContext) -> RunContext:
+        """
+        Save all reports to disk sequentially (sync mode).
+
+        Args:
+            context: Run context with optimization_result
+
+        Returns:
+            Unchanged context (reports saved to disk)
+        """
+        if context.optimization_result is None:
+            raise ValueError("optimization_result must be set in context")
+        if context.output_dir is None:
+            raise ValueError("output_dir must be set in context")
+
+        result = context.optimization_result
+        output_dir = context.output_dir
+
+        self._print_progress("\nSaving final reports...")
+
+        # Save all reports sequentially
+        await save_champion_prompt(result, output_dir)
+        await save_optimization_report(result, context.task_spec, output_dir)
+        await save_champion_questions(result, output_dir)
+        await save_champion_qa_results(result, output_dir)
+        await save_original_prompt_rigorous_results(result, output_dir)
+        await save_testcases_json(result, output_dir)
+        await save_prompts_json(result, output_dir)
+
+        self._print_progress("All reports saved successfully.")
+        return context

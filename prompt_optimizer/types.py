@@ -87,7 +87,13 @@ class PromptCandidate(BaseModel):
         default=None, description="Generation strategy (e.g., 'structured', 'conversational')"
     )
     average_score: float | None = Field(
-        default=None, description="Average evaluation score across all tests"
+        default=None, description="Average evaluation score across all tests (latest stage)"
+    )
+    quick_score: float | None = Field(
+        default=None, description="Quick filter evaluation score (preserved for original prompt)"
+    )
+    rigorous_score: float | None = Field(
+        default=None, description="Rigorous evaluation score (preserved for original prompt)"
     )
     iteration: int = Field(default=0, description="Refinement iteration number")
     track_id: int | None = Field(default=None, description="Refinement track number (0-2)")
@@ -126,10 +132,10 @@ class OptimizationResult(BaseModel):
     run_id: int | None = Field(default=None, description="Identifier for the storage run")
     output_dir: str | None = Field(default=None, description="Directory where results were saved")
     best_prompt: PromptCandidate = Field(description="Champion prompt")
-    all_tracks: list[RefinementTrackResult] = Field(description="Results from all 3 tracks")
-    initial_prompts: list[PromptCandidate] = Field(description="All 15 initial prompts")
-    stage1_top5: list[PromptCandidate] = Field(description="Top 5 from quick filter")
-    stage2_top3: list[PromptCandidate] = Field(description="Top 3 from rigorous testing")
+    all_tracks: list[RefinementTrackResult] = Field(description="Results from all refinement tracks")
+    initial_prompts: list[PromptCandidate] = Field(description="All initially generated prompts")
+    top_k_prompts: list[PromptCandidate] = Field(description="Top K prompts from quick filter")
+    top_m_prompts: list[PromptCandidate] = Field(description="Top M prompts from rigorous testing")
     total_tests_run: int = Field(description="Total number of test evaluations")
     total_time_seconds: float = Field(description="Total optimization time")
     quick_tests: list[TestCase] = Field(description="Quick evaluation test cases")

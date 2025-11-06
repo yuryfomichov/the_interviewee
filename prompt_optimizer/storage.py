@@ -170,7 +170,7 @@ class Storage:
             for row in rows
         ]
 
-    def start_optimization_run(self, task_description: str) -> int:
+    def start_optimization_run(self, task_description: str) -> int | None:
         """Start tracking an optimization run."""
         with self._get_connection() as conn:
             cursor = conn.execute(

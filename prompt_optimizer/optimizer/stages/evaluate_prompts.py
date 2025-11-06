@@ -40,16 +40,16 @@ class EvaluatePromptsStage(BaseStage):
             Updated context with prompts having updated scores
         """
         # Determine which prompts and tests to use
+        original_prompt_for_comparison = None
+
         if self.stage_name == "quick_filter":
             prompts = context.initial_prompts
             tests = context.quick_tests
-            original_prompt_for_comparison = None
         else:  # rigorous
             prompts = context.top_k_prompts.copy()
             tests = context.rigorous_tests
 
             # For rigorous evaluation, check if we need to evaluate original prompt for comparison
-            original_prompt_for_comparison = None
             original_prompt = next(
                 (p for p in context.initial_prompts if p.is_original_system_prompt), None
             )
@@ -89,11 +89,17 @@ class EvaluatePromptsStage(BaseStage):
         for prompt, avg_score in zip(prompts, scores, strict=True):
             prompt.average_score = avg_score
             prompt.stage = self.stage_name
+            # Store scores in dedicated fields for original prompt to preserve both
+            if prompt.is_original_system_prompt:
+                if self.stage_name == "quick_filter":
+                    prompt.quick_score = avg_score
+                else:  # rigorous
+                    prompt.rigorous_score = avg_score
             self.storage.save_prompt(prompt)
 
         if original_prompt_for_comparison:
             self._print_progress(
-                f"Original prompt rigorous score: {original_prompt_for_comparison.average_score:.2f} "
+                f"Original prompt rigorous score: {original_prompt_for_comparison.rigorous_score:.2f} "
                 "(evaluated for comparison only, not advancing to next stage)"
             )
 
@@ -114,16 +120,16 @@ class EvaluatePromptsStage(BaseStage):
             Updated context with prompts having updated scores
         """
         # Determine which prompts and tests to use
+        original_prompt_for_comparison = None
+
         if self.stage_name == "quick_filter":
             prompts = context.initial_prompts
             tests = context.quick_tests
-            original_prompt_for_comparison = None
         else:  # rigorous
             prompts = context.top_k_prompts.copy()
             tests = context.rigorous_tests
 
             # For rigorous evaluation, check if we need to evaluate original prompt for comparison
-            original_prompt_for_comparison = None
             original_prompt = next(
                 (p for p in context.initial_prompts if p.is_original_system_prompt), None
             )
@@ -155,11 +161,17 @@ class EvaluatePromptsStage(BaseStage):
             )
             prompt.average_score = avg_score
             prompt.stage = self.stage_name
+            # Store scores in dedicated fields for original prompt to preserve both
+            if prompt.is_original_system_prompt:
+                if self.stage_name == "quick_filter":
+                    prompt.quick_score = avg_score
+                else:  # rigorous
+                    prompt.rigorous_score = avg_score
             self.storage.save_prompt(prompt)
 
         if original_prompt_for_comparison:
             self._print_progress(
-                f"Original prompt rigorous score: {original_prompt_for_comparison.average_score:.2f} "
+                f"Original prompt rigorous score: {original_prompt_for_comparison.rigorous_score:.2f} "
                 "(evaluated for comparison only, not advancing to next stage)"
             )
 

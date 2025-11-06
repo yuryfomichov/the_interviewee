@@ -12,6 +12,8 @@ from prompt_optimizer.optimizer.stages import (
     GeneratePromptsStage,
     GenerateTestsStage,
     RefinementStage,
+    ReportingStage,
+    SaveReportsStage,
     SelectTopPromptsStage,
 )
 from prompt_optimizer.storage import Storage
@@ -82,6 +84,10 @@ class PromptOptimizer:
             SelectTopPromptsStage(self.config.top_m_refine, "rigorous", **stage_kwargs),
             # Stage 8: Parallel refinement
             RefinementStage(**stage_kwargs),
+            # Stage 9: Prepare report
+            ReportingStage(**stage_kwargs),
+            # Stage 10: Save reports to disk
+            SaveReportsStage(**stage_kwargs),
         ]
 
     async def optimize(self) -> OptimizationResult:
@@ -104,64 +110,24 @@ class PromptOptimizer:
         self._print_progress(f"Task: {spec.task_description}")
         self._print_progress(f"Output directory: {run_output_dir}")
 
-        # Initialize context
-        context = RunContext(task_spec=spec, output_dir=str(run_output_dir))
+        # Initialize context with run metadata
+        context = RunContext(
+            task_spec=spec,
+            output_dir=str(run_output_dir),
+            run_id=run_id,
+            start_time=start_time,
+        )
 
         # Execute all stages sequentially, each updating the context
         for idx, stage in enumerate(self.stages):
             self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
             context = await stage.run(context)
 
-        # Extract results from context
-        champion = max(
-            (tr.final_prompt for tr in context.refinement_tracks),
-            key=lambda p: p.average_score or 0,
-        )
-        self._print_progress("\n=== OPTIMIZATION COMPLETE ===")
-        self._print_progress(f"Champion Score: {champion.average_score:.2f}")
-        self._print_progress(f"Champion Track: {champion.track_id}")
+        # Return the optimization result created by Stage 9 (ReportingStage)
+        if context.optimization_result is None:
+            raise RuntimeError("ReportingStage did not populate optimization_result")
 
-        total_time = time.time() - start_time
-        total_tests = len(context.initial_prompts) * len(context.quick_tests) + len(
-            context.top_k_prompts
-        ) * len(context.rigorous_tests)
-
-        self.storage.complete_optimization_run(run_id, champion.id, total_tests)
-
-        # Find original system prompt if it was included
-        original_prompt = next(
-            (p for p in context.initial_prompts if p.is_original_system_prompt), None
-        )
-
-        # Get all test results for the champion
-        champion_test_results = self.storage.get_prompt_evaluations(champion.id)
-
-        # Get original prompt results (already evaluated with rigorous tests in Stage 6)
-        original_rigorous_score = None
-        original_test_results = []
-        if original_prompt:
-            # Original prompt was already evaluated with rigorous tests in Stage 6
-            # (either as part of top_k or temporarily added for comparison)
-            original_rigorous_score = original_prompt.average_score
-            original_test_results = self.storage.get_prompt_evaluations(original_prompt.id)
-
-        return OptimizationResult(
-            run_id=run_id,
-            output_dir=str(run_output_dir),
-            best_prompt=champion,
-            all_tracks=context.refinement_tracks,
-            initial_prompts=context.initial_prompts,
-            stage1_top5=context.top_k_prompts,
-            stage2_top3=context.top_m_prompts,
-            total_tests_run=total_tests,
-            total_time_seconds=total_time,
-            quick_tests=context.quick_tests,
-            rigorous_tests=context.rigorous_tests,
-            original_system_prompt=original_prompt,
-            original_system_prompt_rigorous_score=original_rigorous_score,
-            original_system_prompt_test_results=original_test_results,
-            champion_test_results=champion_test_results,
-        )
+        return context.optimization_result
 
     def _print_progress(self, message: str, end: str = "\n") -> None:
         """Print progress if verbose mode is enabled."""

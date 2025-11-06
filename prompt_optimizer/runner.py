@@ -11,14 +11,7 @@ from pathlib import Path
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer import PromptOptimizer
-from prompt_optimizer.reports import (
-    display_results,
-    save_champion_prompt,
-    save_champion_qa_results,
-    save_champion_questions,
-    save_optimization_report,
-    save_original_prompt_rigorous_results,
-)
+from prompt_optimizer.reports import display_results
 from prompt_optimizer.types import OptimizationResult
 
 logger = logging.getLogger(__name__)
@@ -44,20 +37,19 @@ class OptimizationRunner:
         self.config = config
         self.results_root = config.results_path
         self.results_root.mkdir(parents=True, exist_ok=True)
-        self.last_run_dir: Path | None = None
         self.verbose = verbose
 
         if config.task_spec is None:
             raise ValueError("OptimizerConfig must have task_spec populated")
 
         # Optimizer will be created in run() method with output_dir
-        self.optimizer = None
+        self.optimizer: PromptOptimizer | None = None
 
-    async def run(self) -> OptimizationResult:
+    async def run(self) -> tuple[OptimizationResult, Path | None]:
         """Run the optimization pipeline with reporting.
 
         Returns:
-            OptimizationResult with champion prompt and metrics
+            Tuple of (OptimizationResult, last_run_dir path)
         """
         if self.verbose:
             self._print_header()
@@ -71,21 +63,12 @@ class OptimizationRunner:
         result = await self.optimizer.optimize()
 
         # Get output directory from result
-        run_output_dir = result.output_dir
-        self.last_run_dir = Path(run_output_dir) if run_output_dir else None
+        last_run_dir = Path(result.output_dir) if result.output_dir else None
 
         if self.verbose:
             display_results(result)
 
-        # Save all final results to the directory created by orchestrator
-        if run_output_dir:
-            save_champion_prompt(result, output_dir=run_output_dir)
-            save_optimization_report(result, self.config.task_spec, output_dir=run_output_dir)
-            save_champion_questions(result, output_dir=run_output_dir)
-            save_champion_qa_results(result, output_dir=run_output_dir)
-            save_original_prompt_rigorous_results(result, output_dir=run_output_dir)
-
-        return result
+        return result, last_run_dir
 
     def _print_header(self) -> None:
         """Print optimization header."""

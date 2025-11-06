@@ -39,9 +39,7 @@ def save_original_prompt_quick_report(
 
     # Determine ranking
     sorted_prompts = sorted(initial_prompts, key=lambda p: p.average_score or 0, reverse=True)
-    rank = next(
-        (i + 1 for i, p in enumerate(sorted_prompts) if p.id == original_prompt.id), None
-    )
+    rank = next((i + 1 for i, p in enumerate(sorted_prompts) if p.id == original_prompt.id), None)
 
     # Check if advanced
     advanced = original_prompt in top_k_prompts
@@ -59,7 +57,7 @@ def save_original_prompt_quick_report(
 
         # Performance breakdown
         if test_results:
-            scores_by_category = {}
+            scores_by_category: dict[str, list[float]] = {}
             for test_result in test_results:
                 test_case = test_case_map.get(test_result.test_case_id)
                 if test_case:
@@ -83,7 +81,7 @@ def save_original_prompt_quick_report(
         f.write("=" * 70 + "\n\n")
 
         # Group by category
-        by_category = {}
+        by_category: dict[str, list[tuple]] = {}
         for test_result in test_results:
             test_case = test_case_map.get(test_result.test_case_id)
             if test_case:
@@ -104,14 +102,14 @@ def save_original_prompt_quick_report(
                 f.write(f"Question: {test_case.input_message}\n")
                 f.write(f"Expected: {test_case.expected_behavior}\n\n")
                 f.write(f"Answer:\n{test_result.model_response}\n\n")
-                f.write(f"Evaluation:\n")
+                f.write("Evaluation:\n")
                 f.write(f"  Overall Score: {test_result.evaluation.overall:.2f}/10\n")
                 f.write(f"  Functionality: {test_result.evaluation.functionality}/10\n")
                 f.write(f"  Safety: {test_result.evaluation.safety}/10\n")
                 f.write(f"  Consistency: {test_result.evaluation.consistency}/10\n")
                 f.write(f"  Edge Case: {test_result.evaluation.edge_case_handling}/10\n")
                 f.write(f"  Reasoning: {test_result.evaluation.reasoning}\n")
-                f.write(f"\n")
+                f.write("\n")
 
         # Original prompt text
         f.write("=" * 70 + "\n")

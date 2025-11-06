@@ -2,7 +2,13 @@
 
 from pydantic import BaseModel, Field
 
-from prompt_optimizer.types import PromptCandidate, RefinementTrackResult, TaskSpec, TestCase
+from prompt_optimizer.types import (
+    OptimizationResult,
+    PromptCandidate,
+    RefinementTrackResult,
+    TaskSpec,
+    TestCase,
+)
 
 
 class RunContext(BaseModel):
@@ -19,6 +25,10 @@ class RunContext(BaseModel):
     output_dir: str | None = Field(
         default=None, description="Directory for saving intermediate reports during optimization"
     )
+
+    # Run metadata
+    run_id: int | None = Field(default=None, description="Optimization run ID")
+    start_time: float | None = Field(default=None, description="When optimization started")
 
     # Stage 1 output: Generated prompts
     initial_prompts: list[PromptCandidate] = Field(
@@ -52,6 +62,11 @@ class RunContext(BaseModel):
     # Stage 8 output: Refinement results
     refinement_tracks: list[RefinementTrackResult] = Field(
         default_factory=list, description="Results from parallel refinement tracks"
+    )
+
+    # Stage 9 output: Final optimization result
+    optimization_result: OptimizationResult | None = Field(
+        default=None, description="Final optimization result with complete analysis"
     )
 
     class Config:
