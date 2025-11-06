@@ -8,9 +8,6 @@ from prompt_optimizer.reports.save_optimization_report import save_optimization_
 from prompt_optimizer.reports.save_original_prompt_quick_report import (
     save_original_prompt_quick_report,
 )
-from prompt_optimizer.reports.save_original_prompt_rigorous_report import (
-    save_original_prompt_rigorous_report,
-)
 from prompt_optimizer.reports.save_original_prompt_rigorous_results import (
     save_original_prompt_rigorous_results,
 )
@@ -22,6 +19,5 @@ __all__ = [
     "save_champion_questions",
     "save_optimization_report",
     "save_original_prompt_quick_report",
-    "save_original_prompt_rigorous_report",
     "save_original_prompt_rigorous_results",
 ]
