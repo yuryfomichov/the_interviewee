@@ -12,6 +12,81 @@ from prompt_optimizer.agents.refiner_agent import RefinedPromptOutput
 from prompt_optimizer.agents.test_designer_agent import TestCasesOutput
 from prompt_optimizer.schemas import EvaluationScore, TestCase
 
+# Test configuration constants - shared with conftest.py
+# These values should match the test configurations to avoid string parsing
+
+# Default prompt generation counts for different test configs
+DEFAULT_NUM_PROMPTS = 15
+
+# Test distributions for different test scenarios
+TEST_DISTRIBUTIONS = {
+    "minimal_quick": {"core": 1, "edge": 1, "boundary": 0, "adversarial": 0, "consistency": 0, "format": 0},
+    "minimal_rigorous": {"core": 2, "edge": 1, "boundary": 0, "adversarial": 0, "consistency": 0, "format": 0},
+    "realistic_quick": {"core": 2, "edge": 2, "boundary": 1, "adversarial": 1, "consistency": 1, "format": 0},
+    "realistic_rigorous": {"core": 20, "edge": 10, "boundary": 10, "adversarial": 5, "consistency": 3, "format": 2},
+    "default": {"core": 20, "edge": 10, "boundary": 10, "adversarial": 5, "consistency": 3, "format": 2},
+}
+
+# Scoring weights (should match config defaults)
+DEFAULT_SCORING_WEIGHTS = {
+    "functionality": 0.4,
+    "safety": 0.3,
+    "consistency": 0.2,
+    "edge_case_handling": 0.1
+}
+
+
+def _infer_distribution_from_instructions(instructions: str) -> dict[str, int]:
+    """
+    Infer which test distribution to use based on instruction patterns.
+
+    Uses simple heuristics instead of regex parsing:
+    - Look for total test count mentions
+    - Look for specific distribution patterns
+    - Fall back to default
+
+    Args:
+        instructions: Agent instructions text
+
+    Returns:
+        Dictionary with test distribution by category
+    """
+    # Quick heuristic: check for known total counts
+    # Minimal quick: 2 tests, Minimal rigorous: 3 tests
+    # Realistic quick: 7 tests, Realistic rigorous: 50 tests
+
+    if "EXACTLY 2 evaluation tests" in instructions or "distribution:\n- **core**: EXACTLY 1" in instructions:
+        return TEST_DISTRIBUTIONS["minimal_quick"]
+    elif "EXACTLY 3 evaluation tests" in instructions:
+        return TEST_DISTRIBUTIONS["minimal_rigorous"]
+    elif "EXACTLY 7 evaluation tests" in instructions:
+        return TEST_DISTRIBUTIONS["realistic_quick"]
+    elif "EXACTLY 50 evaluation tests" in instructions or "EXACTLY 20 tests" in instructions and "core" in instructions:
+        return TEST_DISTRIBUTIONS["realistic_rigorous"]
+
+    # Fallback: use default distribution
+    return TEST_DISTRIBUTIONS["default"]
+
+
+def _infer_prompt_count_from_instructions(instructions: str) -> int:
+    """
+    Infer prompt count from instructions using simple patterns.
+
+    Args:
+        instructions: Agent instructions text
+
+    Returns:
+        Number of prompts to generate
+    """
+    # Common counts: 3 (minimal), 15 (realistic)
+    if "exactly 3 diverse" in instructions.lower():
+        return 3
+    elif "exactly 15 diverse" in instructions.lower():
+        return 15
+
+    # Fallback
+    return DEFAULT_NUM_PROMPTS
+
 
 class FakeRunnerResult:
     """Mimics the result structure from agents.Runner.run()."""
@@ -60,16 +135,9 @@ def create_fake_generator_response(agent) -> GeneratedPromptsOutput:
     Returns:
         GeneratedPromptsOutput with list of prompts
     """
-    # Extract target count from agent instructions
+    # Infer count from instructions using simple pattern matching
     instructions = agent.instructions
-    n = 15  # default
-    if "Generate exactly" in instructions:
-        try:
-            # Parse "Generate exactly N diverse"
-            parts = instructions.split("Generate exactly")[1].split("diverse")[0].strip()
-            n = int(parts)
-        except (IndexError, ValueError):
-            pass
+    n = _infer_prompt_count_from_instructions(instructions)
 
     # Create deterministic seed from instructions
     seed = int(hashlib.md5(instructions.encode()).hexdigest()[:8], 16)
@@ -150,35 +218,13 @@ def create_fake_test_designer_response(agent) -> TestCasesOutput:
     Returns:
         TestCasesOutput with list of test cases
     """
-    # Extract distribution from instructions
+    # Infer distribution from instructions using simple pattern matching
     instructions = agent.instructions
     seed = int(hashlib.md5(instructions.encode()).hexdigest()[:8], 16)
     rng = random.Random(seed)
 
-    # Parse distribution from instructions
-    # Instructions contain lines like: "- **core**: EXACTLY 2 tests (description)"
-    distribution = {}
-    import re
-
-    for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
-        # Look for pattern: "- **category**: EXACTLY N tests"
-        pattern = rf"-\s*\*\*{category}\*\*:\s*EXACTLY\s+(\d+)\s+tests?"
-        match = re.search(pattern, instructions, re.IGNORECASE)
-        if match:
-            count = int(match.group(1))
-            distribution[category] = count
-
-    # Fallback to default if parsing failed
-    if not distribution or sum(distribution.values()) == 0:
-        # Default distribution
-        distribution = {
-            "core": 20,
-            "edge": 10,
-            "boundary": 10,
-            "adversarial": 5,
-            "consistency": 3,
-            "format": 2,
-        }
+    # Use helper to infer distribution from instruction patterns
+    distribution = _infer_distribution_from_instructions(instructions)
 
     test_cases = []
     for category, count in distribution.items():
@@ -254,13 +300,12 @@ def create_fake_evaluator_response(agent) -> EvaluationOutput:
         # Structured prompts score better on consistency
         consistency = min(10, consistency + 1)
 
-    # Calculate weighted overall score (default weights)
-    weights = {"functionality": 0.4, "safety": 0.3, "consistency": 0.2, "edge_case_handling": 0.1}
+    # Calculate weighted overall score using constants
     overall = (
-        functionality * weights["functionality"]
-        + safety * weights["safety"]
-        + consistency * weights["consistency"]
-        + edge_case_handling * weights["edge_case_handling"]
+        functionality * DEFAULT_SCORING_WEIGHTS["functionality"]
+        + safety * DEFAULT_SCORING_WEIGHTS["safety"]
+        + consistency * DEFAULT_SCORING_WEIGHTS["consistency"]
+        + edge_case_handling * DEFAULT_SCORING_WEIGHTS["edge_case_handling"]
     )
 
     reasoning = f"Functionality: {functionality}/10, Safety: {safety}/10, Consistency: {consistency}/10, Edge cases: {edge_case_handling}/10"
