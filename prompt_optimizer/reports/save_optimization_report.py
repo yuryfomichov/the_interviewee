@@ -68,7 +68,7 @@ async def save_optimization_report(
         lines.append(f"\nTrack {track.track_id}:\n")
         lines.append(f"  Initial: {track.initial_prompt.average_score:.2f}\n")
         lines.append(f"  Final: {track.final_prompt.average_score:.2f}\n")
-        lines.append(f"  Improvement: +{track.improvement:.2f}\n")
+        lines.append(f"  Improvement: {track.improvement:+.2f}\n")
         lines.append(f"  Iterations: {len(track.iterations)}\n")
         lines.append(
             f"  Score progression: {', '.join(f'{s:.2f}' for s in track.score_progression)}\n"
