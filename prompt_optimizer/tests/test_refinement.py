@@ -241,10 +241,10 @@ async def test_weakness_analysis_stored(
     session = test_database.get_session()
 
     try:
-        from prompt_optimizer.storage.models import WeaknessAnalysisModel
+        from prompt_optimizer.storage.models import WeaknessAnalysis
 
         # Get weakness analyses
-        weaknesses = session.query(WeaknessAnalysisModel).filter_by(
+        weaknesses = session.query(WeaknessAnalysis).filter_by(
             run_id=result.run_id
         ).all()
 
