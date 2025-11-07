@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -61,16 +61,15 @@ class Database:
 
     def _create_indexes(self) -> None:
         """Create additional indexes for performance."""
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
             # Indexes for common queries
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_run_stage ON prompts(run_id, stage)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_score ON prompts(average_score DESC)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_prompts_track ON prompts(run_id, track_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_prompt ON evaluations(prompt_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_evaluations_test ON evaluations(test_case_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_test_cases_run_stage ON test_cases(run_id, stage)")
-            conn.commit()
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_run_stage ON prompts(run_id, stage)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_score ON prompts(average_score DESC)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_track ON prompts(run_id, track_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_prompt ON evaluations(prompt_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_test ON evaluations(test_case_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_test_cases_run_stage ON test_cases(run_id, stage)"))
 
     def get_session(self) -> Session:
         """
