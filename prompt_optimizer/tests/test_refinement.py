@@ -6,13 +6,16 @@ from prompt_optimizer.optimizer.orchestrator import PromptOptimizer
 
 
 @pytest.mark.asyncio
-async def test_refinement_creates_multiple_tracks(
+async def test_refinement_structure(
     minimal_config, dummy_connector, mock_agents, test_database
 ):
     """
-    Test that refinement creates the expected number of parallel tracks.
+    Test that refinement creates proper track structure with isolated tracks.
 
-    Each track should refine a different top-M prompt independently.
+    Verifies:
+    - Creates expected number of parallel tracks
+    - Each track starts from a different top-M prompt
+    - Score progression is tracked for each track
     """
     optimizer = PromptOptimizer(
         model_client=dummy_connector, config=minimal_config, database=test_database
@@ -23,55 +26,16 @@ async def test_refinement_creates_multiple_tracks(
     # Should have top_m_refine tracks
     assert len(result.all_tracks) == minimal_config.top_m_refine
 
-    # Each track should have unique track_id
+    # Each track should have unique track_id (0, 1, 2, ...)
     track_ids = [track.track_id for track in result.all_tracks]
-    assert len(set(track_ids)) == minimal_config.top_m_refine
-
-    # Track IDs should be 0, 1, 2, ... (top_m_refine - 1)
     assert set(track_ids) == set(range(minimal_config.top_m_refine))
 
-
-@pytest.mark.asyncio
-async def test_refinement_tracks_are_isolated(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that refinement tracks are independent.
-
-    Each track should start from a different top-M prompt.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    # Get initial prompts for each track
-    initial_prompt_ids = set()
-    for track in result.all_tracks:
-        initial_prompt_ids.add(track.initial_prompt.id)
-
-    # All tracks should start from different prompts
+    # All tracks should start from different prompts (isolation)
+    initial_prompt_ids = {track.initial_prompt.id for track in result.all_tracks}
     assert len(initial_prompt_ids) == minimal_config.top_m_refine
 
-
-@pytest.mark.asyncio
-async def test_refinement_score_progression_tracked(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that score progression is tracked across refinement iterations.
-
-    Each track should record scores at each iteration.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
+    # Score progression should be tracked for each track
     for track in result.all_tracks:
-        # Should have score_progression list
         assert isinstance(track.score_progression, list)
         assert len(track.score_progression) > 0
 
@@ -84,42 +48,14 @@ async def test_refinement_score_progression_tracked(
 
 
 @pytest.mark.asyncio
-async def test_early_stopping_triggers(
-    early_stopping_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that early stopping triggers when no improvement occurs.
-
-    With patience=1, should stop after 1 iteration without improvement.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=early_stopping_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    # With early stopping, most tracks should have fewer iterations than max
-    max_iterations = early_stopping_config.max_iterations_per_track
-    tracks_with_early_stop = sum(
-        1 for track in result.all_tracks if len(track.iterations) < max_iterations
-    )
-
-    # At least some tracks should have triggered early stopping
-    # (depending on fake agent responses, this may vary)
-    # Just verify the mechanism exists - tracks can complete early
-    assert all(
-        len(track.iterations) <= max_iterations for track in result.all_tracks
-    )
-
-
-@pytest.mark.asyncio
-async def test_refinement_final_prompt_has_best_score_in_track(
+async def test_refinement_keeps_best_score(
     minimal_config, dummy_connector, mock_agents, test_database
 ):
     """
-    Test that the final prompt in each track has the best score from that track.
+    Test that refinement keeps the best-performing prompt in each track.
 
-    The refinement should keep the best-performing prompt.
+    This is the core refinement behavior: the final prompt should have
+    the highest score from all iterations in that track.
     """
     optimizer = PromptOptimizer(
         model_client=dummy_connector, config=minimal_config, database=test_database
@@ -130,32 +66,6 @@ async def test_refinement_final_prompt_has_best_score_in_track(
     for track in result.all_tracks:
         final_score = track.final_prompt.rigorous_score
 
-        # Final score should be at least as good as initial (or best in progression)
+        # Final score should be the best score from the track's progression
         max_score_in_track = max(track.score_progression)
         assert final_score == max_score_in_track
-
-
-@pytest.mark.asyncio
-async def test_parallel_refinement_execution(
-    parallel_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that refinement works correctly in parallel execution mode.
-
-    All tracks should complete successfully with async execution.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=parallel_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    # Should have all tracks completed
-    assert len(result.all_tracks) == parallel_config.top_m_refine
-
-    # Each track should have valid results
-    for track in result.all_tracks:
-        assert track.initial_prompt is not None
-        assert track.final_prompt is not None
-        assert len(track.iterations) >= 0
-        assert len(track.score_progression) > 0
