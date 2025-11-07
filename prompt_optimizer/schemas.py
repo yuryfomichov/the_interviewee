@@ -86,14 +86,11 @@ class PromptCandidate(BaseModel):
     strategy: str | None = Field(
         default=None, description="Generation strategy (e.g., 'structured', 'conversational')"
     )
-    average_score: float | None = Field(
-        default=None, description="Average evaluation score across all tests (latest stage)"
-    )
     quick_score: float | None = Field(
-        default=None, description="Quick filter evaluation score (preserved for original prompt)"
+        default=None, description="Quick filter evaluation score"
     )
     rigorous_score: float | None = Field(
-        default=None, description="Rigorous evaluation score (preserved for original prompt)"
+        default=None, description="Rigorous evaluation score"
     )
     iteration: int = Field(default=0, description="Refinement iteration number")
     track_id: int | None = Field(default=None, description="Refinement track number (0-2)")
@@ -132,7 +129,9 @@ class OptimizationResult(BaseModel):
     run_id: int | None = Field(default=None, description="Identifier for the storage run")
     output_dir: str | None = Field(default=None, description="Directory where results were saved")
     best_prompt: PromptCandidate = Field(description="Champion prompt")
-    all_tracks: list[RefinementTrackResult] = Field(description="Results from all refinement tracks")
+    all_tracks: list[RefinementTrackResult] = Field(
+        description="Results from all refinement tracks"
+    )
     initial_prompts: list[PromptCandidate] = Field(description="All initially generated prompts")
     top_k_prompts: list[PromptCandidate] = Field(description="Top K prompts from quick filter")
     top_m_prompts: list[PromptCandidate] = Field(description="Top M prompts from rigorous testing")

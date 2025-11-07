@@ -7,7 +7,8 @@ from agents import Runner
 from prompt_optimizer.agents.prompt_generator_agent import create_generator_agent
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.types import PromptCandidate
+from prompt_optimizer.schemas import PromptCandidate
+from prompt_optimizer.storage import PromptConverter
 
 
 class GeneratePromptsStage(BaseStage):
@@ -26,7 +27,7 @@ class GeneratePromptsStage(BaseStage):
             context: Run context with task_spec
 
         Returns:
-            Updated context with initial_prompts populated
+            Updated context (prompts saved to database)
         """
         prompts = []
 
@@ -65,7 +66,11 @@ class GeneratePromptsStage(BaseStage):
             f"{len(generated_prompts)} variations)"
         )
 
-        context.initial_prompts = prompts
+        # Save all prompts to database
+        for prompt in prompts:
+            db_prompt = PromptConverter.to_db(prompt, context.run_id)
+            context.prompt_repo.save(db_prompt)
+
         return context
 
     async def _run_sync(self, context: RunContext) -> RunContext:

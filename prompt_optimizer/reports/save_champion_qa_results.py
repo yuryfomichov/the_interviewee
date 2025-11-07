@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 
 async def save_champion_qa_results(result: OptimizationResult, output_dir: str) -> Path:
@@ -18,7 +18,7 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
     Returns:
         Path to saved Q&A file
     """
-    qa_file = Path(output_dir) / "champion_qa_results.txt"
+    qa_file = Path(output_dir) / "champion_qa_results.md"
     qa_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Create a mapping of test_case_id to test case for easy lookup
@@ -29,9 +29,31 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
     lines.append("CHAMPION PROMPT Q&A RESULTS\n")
     lines.append("=" * 70 + "\n")
     lines.append(f"Champion Prompt ID: {result.best_prompt.id}\n")
-    lines.append(f"Overall Score: {result.best_prompt.average_score:.2f}\n")
+    lines.append(f"Overall Score: {result.best_prompt.rigorous_score:.2f}\n")
     lines.append(f"Total Tests: {len(result.champion_test_results)}\n")
     lines.append("=" * 70 + "\n\n")
+
+    # Weaknesses summary
+    failures = [test for test in result.champion_test_results if test.evaluation.overall < 7.0]
+    if failures:
+        lines.append("WEAKNESSES SUMMARY\n")
+        lines.append("-" * 70 + "\n")
+        lines.append(
+            f"Found {len(failures)} test(s) with scores below 7.0 "
+            f"(out of {len(result.champion_test_results)} total):\n\n"
+        )
+        for test_result in failures:
+            test_case = test_case_map.get(test_result.test_case_id)
+            if test_case:
+                lines.append(
+                    f"  • [{test_case.category.upper()}] Score: {test_result.evaluation.overall:.2f} "
+                    f"- {test_case.input_message[:60]}...\n"
+                )
+        lines.append("\n")
+    else:
+        lines.append("WEAKNESSES SUMMARY\n")
+        lines.append("-" * 70 + "\n")
+        lines.append("No significant weaknesses - all tests scored 7.0 or above! ✓\n\n")
 
     # Group by category
     by_category: dict[str, list[tuple]] = {}

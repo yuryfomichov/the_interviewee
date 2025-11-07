@@ -6,9 +6,10 @@ and the generic prompt optimization runner.
 
 import logging
 import os
+from pathlib import Path
 
 from prompt_optimizer.runner import OptimizationRunner
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 from .config import create_optimizer_config
 from .connector import RAGConnector
@@ -16,7 +17,7 @@ from .connector import RAGConnector
 logger = logging.getLogger(__name__)
 
 
-async def run_optimization() -> OptimizationResult | None:
+async def run_optimization() -> tuple[OptimizationResult, Path | None] | None:
     """
     Run the RAG engine prompt optimization pipeline.
 
@@ -27,7 +28,7 @@ async def run_optimization() -> OptimizationResult | None:
     4. Runs optimization pipeline with reporting
 
     Returns:
-        OptimizationResult if successful, None if setup validation fails
+        Tuple of (OptimizationResult, report_path) if successful, None if setup validation fails
     """
     print("=" * 70)
     print("AI INTERVIEWEE SYSTEM PROMPT OPTIMIZER")

@@ -2,7 +2,7 @@
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.reports import save_original_prompt_quick_report
+from prompt_optimizer.storage import PromptConverter
 
 
 class SelectTopPromptsStage(BaseStage):
@@ -14,7 +14,7 @@ class SelectTopPromptsStage(BaseStage):
 
         Args:
             top_n: Number of top prompts to select
-            selection_type: "quick" or "rigorous" to determine which field to update
+            selection_type: "quick" or "rigorous" to determine which stage to query from
             *args, **kwargs: Passed to BaseStage
         """
         super().__init__(*args, **kwargs)
@@ -31,46 +31,30 @@ class SelectTopPromptsStage(BaseStage):
         Select top N prompts by score (async mode).
 
         Args:
-            context: Run context with prompts
+            context: Run context with database access
 
         Returns:
-            Updated context with top_k_prompts or top_m_prompts populated
+            Updated context (top prompts already in database with scores)
         """
-        # Determine which prompts to select from
+        # Query top N prompts from database based on selection type
         if self.selection_type == "quick":
-            prompts = context.initial_prompts.copy()
+            # Get top K from quick_filter stage
+            db_top_prompts = context.prompt_repo.get_top_k(
+                context.run_id, "quick_filter", self.top_n
+            )
         else:  # rigorous
-            prompts = context.top_k_prompts.copy()
+            # Get top M from rigorous stage
+            db_top_prompts = context.prompt_repo.get_top_k(context.run_id, "rigorous", self.top_n)
 
-        prompts.sort(key=lambda p: p.average_score or 0, reverse=True)
-        top_prompts = prompts[: self.top_n]
+        # Convert to Pydantic for display
+        top_prompts = [PromptConverter.from_db(p) for p in db_top_prompts]
 
+        # Display using the appropriate score field for this selection type
+        score_field = "quick_score" if self.selection_type == "quick" else "rigorous_score"
+        scores_display = [f'{getattr(p, score_field):.2f}' for p in top_prompts if getattr(p, score_field) is not None]
         self._print_progress(
-            f"\nTop {self.top_n} prompts selected "
-            f"(scores: {[f'{p.average_score:.2f}' for p in top_prompts]})"
+            f"\nTop {self.top_n} prompts selected (scores: {scores_display})"
         )
-
-        # Update context
-        if self.selection_type == "quick":
-            context.top_k_prompts = top_prompts
-
-            # Save original prompt quick test report if available
-            if context.output_dir:
-                original_prompt = next(
-                    (p for p in context.initial_prompts if p.is_original_system_prompt), None
-                )
-                if original_prompt:
-                    self._print_progress("\nSaving original prompt quick test report...")
-                    save_original_prompt_quick_report(
-                        original_prompt=original_prompt,
-                        quick_tests=context.quick_tests,
-                        initial_prompts=context.initial_prompts,
-                        top_k_prompts=context.top_k_prompts,
-                        storage=self.storage,
-                        output_dir=context.output_dir,
-                    )
-        else:  # rigorous
-            context.top_m_prompts = top_prompts
 
         return context
 
@@ -79,10 +63,10 @@ class SelectTopPromptsStage(BaseStage):
         Select top N prompts by score (sync mode - same as async for this stage).
 
         Args:
-            context: Run context with prompts
+            context: Run context with database access
 
         Returns:
-            Updated context with top_k_prompts or top_m_prompts populated
+            Updated context (top prompts already in database with scores)
         """
         # This stage is purely computational, no difference between sync and async
         return await self._run_async(context)

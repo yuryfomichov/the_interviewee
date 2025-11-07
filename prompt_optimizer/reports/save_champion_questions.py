@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 
 async def save_champion_questions(result: OptimizationResult, output_dir: str) -> Path:
@@ -18,7 +18,7 @@ async def save_champion_questions(result: OptimizationResult, output_dir: str) -
     Returns:
         Path to saved questions file
     """
-    questions_file = Path(output_dir) / "champion_test_questions.txt"
+    questions_file = Path(output_dir) / "champion_test_questions.md"
     questions_file.parent.mkdir(parents=True, exist_ok=True)
 
     lines = []

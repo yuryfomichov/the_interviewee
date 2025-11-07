@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 
 async def save_champion_prompt(result: OptimizationResult, output_dir: str) -> Path:
@@ -18,7 +18,7 @@ async def save_champion_prompt(result: OptimizationResult, output_dir: str) -> P
     Returns:
         Path to saved champion prompt file
     """
-    output_file = Path(output_dir) / "champion_prompt.txt"
+    output_file = Path(output_dir) / "champion_prompt.md"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     async with aiofiles.open(output_file, "w") as f:

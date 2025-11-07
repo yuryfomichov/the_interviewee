@@ -2,7 +2,7 @@
 
 import logging
 
-from prompt_optimizer.types import EvaluationScore
+from prompt_optimizer.schemas import EvaluationScore
 
 logger = logging.getLogger(__name__)
 

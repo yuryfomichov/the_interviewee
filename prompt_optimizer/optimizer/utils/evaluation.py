@@ -7,16 +7,17 @@ from agents import Runner
 from prompt_optimizer.agents.evaluator_agent import EvaluationOutput, create_evaluator_agent
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
+from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.model_tester import test_target_model
 from prompt_optimizer.optimizer.utils.score_calculator import aggregate_prompt_score
-from prompt_optimizer.storage import Storage
-from prompt_optimizer.types import (
+from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
     TaskSpec,
     TestCase,
     TestResult,
 )
+from prompt_optimizer.storage import EvaluationConverter
 
 
 async def evaluate_prompt(
@@ -25,7 +26,7 @@ async def evaluate_prompt(
     task_spec: TaskSpec,
     config: OptimizerConfig,
     model_client: BaseConnector,
-    storage: Storage,
+    context: RunContext,
     parallel: bool = True,
     semaphore: asyncio.Semaphore | None = None,
 ) -> float:
@@ -38,7 +39,7 @@ async def evaluate_prompt(
         task_spec: Task specification
         config: Optimizer configuration
         model_client: Connector for the target model
-        storage: Storage instance for saving results
+        context: Run context for database access
         parallel: Whether to run evaluations in parallel (default: True)
         semaphore: Optional shared semaphore for global concurrency control.
                    If None and parallel=True, creates a local semaphore.
@@ -79,14 +80,15 @@ async def evaluate_prompt(
             weights=config.scoring_weights,
         )
 
-        # Save to storage
+        # Save evaluation to database
         test_result = TestResult(
             test_case_id=test.id,
             prompt_id=prompt.id,
             model_response=response,
             evaluation=evaluation,
         )
-        storage.save_evaluation(test_result)
+        db_evaluation = EvaluationConverter.to_db(test_result, context.run_id)
+        context.eval_repo.save(db_evaluation)
         return evaluation
 
     # Run evaluations in parallel or sequentially based on config

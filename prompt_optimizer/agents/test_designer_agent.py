@@ -4,7 +4,7 @@ from agents import Agent
 from pydantic import BaseModel, Field
 
 from prompt_optimizer.config import LLMConfig, TestDistribution
-from prompt_optimizer.types import TaskSpec, TestCase
+from prompt_optimizer.schemas import TaskSpec, TestCase
 
 
 class TestCasesOutput(BaseModel):

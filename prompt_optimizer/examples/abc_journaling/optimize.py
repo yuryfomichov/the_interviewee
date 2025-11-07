@@ -74,9 +74,9 @@ async def main() -> None:
     print("=" * 70)
     print("OPTIMIZATION COMPLETE")
     print("=" * 70)
-    average_score = result.best_prompt.average_score
-    if average_score is not None:
-        print(f"\nChampion score: {average_score:.2f}")
+    champion_score = result.best_prompt.rigorous_score
+    if champion_score is not None:
+        print(f"\nChampion score: {champion_score:.2f}")
     print(f"Champion prompt ID: {result.best_prompt.id}")
     if result.best_prompt.track_id is not None:
         print(f"Refinement track: {result.best_prompt.track_id}")

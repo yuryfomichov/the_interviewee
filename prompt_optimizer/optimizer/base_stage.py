@@ -6,7 +6,7 @@ from collections.abc import Callable
 from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.storage import Storage
+from prompt_optimizer.storage import Database
 
 
 class BaseStage(ABC):
@@ -19,7 +19,7 @@ class BaseStage(ABC):
     def __init__(
         self,
         config: OptimizerConfig,
-        storage: Storage,
+        database: Database,
         model_client: BaseConnector,
         progress_callback: Callable[[str], None] | None = None,
     ):
@@ -28,12 +28,12 @@ class BaseStage(ABC):
 
         Args:
             config: Optimizer configuration
-            storage: Storage instance
+            database: Database instance
             model_client: Connector for testing the target model
             progress_callback: Optional callback for progress messages
         """
         self.config = config
-        self.storage = storage
+        self.database = database
         self.model_client = model_client
         self._print_progress = progress_callback or (lambda msg: None)
 

@@ -12,7 +12,7 @@ from prompt_optimizer.config import OptimizerConfig
 from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer import PromptOptimizer
 from prompt_optimizer.reports import display_results
-from prompt_optimizer.types import OptimizationResult
+from prompt_optimizer.schemas import OptimizationResult
 
 logger = logging.getLogger(__name__)
 
