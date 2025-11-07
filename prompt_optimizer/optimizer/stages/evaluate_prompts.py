@@ -147,7 +147,7 @@ class EvaluatePromptsStage(BaseStage):
 
     def _get_prompts_and_tests(
         self, context: RunContext, execution_mode: Literal["parallel", "sequential"]
-    ) -> tuple[list, list, object | None]:
+    ) -> tuple[list, list, Prompt | None]:
         """
         Query and convert prompts and tests from database.
 
