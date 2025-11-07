@@ -74,7 +74,7 @@ class EvaluatePromptsStage(BaseStage):
         scores = await asyncio.gather(*eval_tasks)
 
         # Update prompts with scores and save to database
-        self._update_and_save_prompt_scores(context, prompts, scores)
+        self._update_and_save_prompt_scores(context, prompts, scores, original_prompt_for_comparison)
 
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
@@ -123,7 +123,7 @@ class EvaluatePromptsStage(BaseStage):
             scores.append(avg_score)
 
         # Update prompts with scores and save to database
-        self._update_and_save_prompt_scores(context, prompts, scores)
+        self._update_and_save_prompt_scores(context, prompts, scores, original_prompt_for_comparison)
 
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
@@ -178,7 +178,7 @@ class EvaluatePromptsStage(BaseStage):
         return prompts, tests, original_prompt_for_comparison
 
     def _update_and_save_prompt_scores(
-        self, context: RunContext, prompts: list, scores: list[float]
+        self, context: RunContext, prompts: list, scores: list[float], comparison_prompt = None
     ) -> None:
         """
         Update prompts with scores and save to database.
@@ -187,28 +187,34 @@ class EvaluatePromptsStage(BaseStage):
             context: Run context with database access
             prompts: List of prompt candidates
             scores: List of average scores corresponding to prompts
+            comparison_prompt: Optional DB prompt that was added for comparison only (should not advance)
         """
         for prompt, avg_score in zip(prompts, scores, strict=True):
-            # Get existing prompt from DB to preserve stage if needed
-            existing_db_prompt = context.prompt_repo.get_by_id(prompt.id)
-
             prompt.average_score = avg_score
 
-            # For rigorous stage: DO NOT update stage for original prompt if it's just for comparison
-            # (it should stay at its current stage so it won't be selected for refinement)
-            if self.stage_name == "rigorous" and prompt.is_original_system_prompt:
-                # Keep the original prompt at its current stage (don't advance it)
+            # Check if this is a comparison-only prompt (should not advance)
+            is_comparison_only = (
+                comparison_prompt is not None
+                and prompt.id == comparison_prompt.id
+            )
+
+            if is_comparison_only:
+                # This prompt was added for comparison only - don't update its stage
+                # Get existing stage from DB
+                existing_db_prompt = context.prompt_repo.get_by_id(prompt.id)
                 if existing_db_prompt:
-                    prompt.stage = existing_db_prompt.stage  # Preserve existing stage
-                # But still store the rigorous score for reporting
+                    prompt.stage = existing_db_prompt.stage  # Keep at current stage
+                # Store the rigorous score for reporting
                 prompt.rigorous_score = avg_score
             else:
-                # For all other prompts, update the stage normally
+                # Normal flow: update stage for all prompts (including original if it was selected)
                 prompt.stage = self.stage_name
                 # Store scores in dedicated fields for original prompt
                 if prompt.is_original_system_prompt:
                     if self.stage_name == "quick_filter":
                         prompt.quick_score = avg_score
+                    else:  # rigorous
+                        prompt.rigorous_score = avg_score
 
             # Save to database
             db_prompt = PromptConverter.to_db(prompt, context.run_id)
