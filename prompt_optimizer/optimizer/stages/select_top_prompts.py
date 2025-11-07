@@ -2,7 +2,6 @@
 
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.reports import save_original_prompt_quick_report
 from prompt_optimizer.storage import PromptConverter
 
 
@@ -54,35 +53,6 @@ class SelectTopPromptsStage(BaseStage):
             f"\nTop {self.top_n} prompts selected "
             f"(scores: {[f'{p.average_score:.2f}' for p in top_prompts]})"
         )
-
-        # For quick selection, save original prompt quick test report if available
-        if self.selection_type == "quick" and context.output_dir:
-            original_db_prompt = context.prompt_repo.get_original_prompt(context.run_id)
-            if original_db_prompt:
-                self._print_progress("\nSaving original prompt quick test report...")
-
-                # Query data needed for report
-                # Note: After quick_filter evaluation, prompts have stage="quick_filter", not "initial"
-                initial_db_prompts = context.prompt_repo.get_by_stage(
-                    context.run_id, "quick_filter"
-                )
-                quick_db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
-
-                # Convert to Pydantic
-                from prompt_optimizer.storage import TestCaseConverter
-
-                original_prompt = PromptConverter.from_db(original_db_prompt)
-                initial_prompts = [PromptConverter.from_db(p) for p in initial_db_prompts]
-                quick_tests = [TestCaseConverter.from_db(t) for t in quick_db_tests]
-
-                save_original_prompt_quick_report(
-                    original_prompt=original_prompt,
-                    quick_tests=quick_tests,
-                    initial_prompts=initial_prompts,
-                    top_k_prompts=top_prompts,
-                    context=context,
-                    output_dir=context.output_dir,
-                )
 
         return context
 
