@@ -122,8 +122,15 @@ class ReportingStage(BaseStage):
         Returns:
             Champion prompt with highest score
         """
-        db_refined_prompts = context.prompt_repo.get_by_stage(context.run_id, "refined")
-        champion_db = max(db_refined_prompts, key=lambda p: p.average_score or 0)
+        # Get ALL prompts from refinement tracks (track_id is not None)
+        # Don't filter by stage because iteration 0 is "rigorous" not "refined"
+        all_prompts = context.prompt_repo.get_all_for_run(context.run_id)
+        track_prompts = [p for p in all_prompts if p.track_id is not None]
+
+        if not track_prompts:
+            raise ValueError("No refinement track prompts found!")
+
+        champion_db = max(track_prompts, key=lambda p: p.average_score or 0)
         return PromptConverter.from_db(champion_db)
 
     def _query_all_prompts_and_tests(self, context: RunContext) -> dict:
