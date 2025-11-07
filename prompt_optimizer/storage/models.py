@@ -44,7 +44,6 @@ class Prompt(Base):
     prompt_text: Mapped[str] = mapped_column(Text)
     stage: Mapped[str]  # initial, quick_filter, rigorous, refined
     strategy: Mapped[str | None] = mapped_column(default=None)
-    average_score: Mapped[float | None] = mapped_column(default=None)
     quick_score: Mapped[float | None] = mapped_column(default=None)
     rigorous_score: Mapped[float | None] = mapped_column(default=None)
     iteration: Mapped[int] = mapped_column(default=0)

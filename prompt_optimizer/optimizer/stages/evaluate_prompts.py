@@ -88,8 +88,11 @@ class EvaluatePromptsStage(BaseStage):
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
 
+        # Display scores using the appropriate field for this stage
+        score_field = "quick_score" if self.stage_name == "quick_filter" else "rigorous_score"
+        scores_display = [f'{getattr(p, score_field):.2f}' for p in prompts[:5] if getattr(p, score_field) is not None]
         self._print_progress(
-            f"Evaluation complete (scores: {[f'{p.average_score:.2f}' for p in prompts[:5]]}...)"
+            f"Evaluation complete (scores: {scores_display}...)"
         )
 
         return context
@@ -139,8 +142,11 @@ class EvaluatePromptsStage(BaseStage):
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
 
+        # Display scores using the appropriate field for this stage
+        score_field = "quick_score" if self.stage_name == "quick_filter" else "rigorous_score"
+        scores_display = [f'{getattr(p, score_field):.2f}' for p in prompts[:5] if getattr(p, score_field) is not None]
         self._print_progress(
-            f"Evaluation complete (scores: {[f'{p.average_score:.2f}' for p in prompts[:5]]}...)"
+            f"Evaluation complete (scores: {scores_display}...)"
         )
 
         return context
@@ -203,8 +209,6 @@ class EvaluatePromptsStage(BaseStage):
             comparison_prompt: Optional DB prompt that was added for comparison only (should not advance)
         """
         for prompt, avg_score in zip(prompts, scores, strict=True):
-            prompt.average_score = avg_score
-
             # Check if this is a comparison-only prompt (should not advance)
             is_comparison_only = comparison_prompt is not None and prompt.id == comparison_prompt.id
 
