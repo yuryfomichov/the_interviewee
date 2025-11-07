@@ -52,9 +52,7 @@ class PromptConverter:
         return PromptCandidate(
             id=prompt.id,
             prompt_text=prompt.prompt_text,
-            stage=cast(
-                Literal["initial", "quick_filter", "rigorous", "refined"], prompt.stage
-            ),
+            stage=cast(Literal["initial", "quick_filter", "rigorous", "refined"], prompt.stage),
             strategy=prompt.strategy,
             average_score=prompt.average_score,
             quick_score=prompt.quick_score,
