@@ -99,11 +99,13 @@ class RefinementStage(BaseStage):
 
         # Initialize tracking variables
         current_prompt = initial_prompt
-        best_score = current_prompt.average_score or 0
+        initial_score = current_prompt.average_score or 0
+        best_score = initial_score
+        current_score = initial_score
         no_improvement_count = 0
         parent_prompt_id = initial_prompt.id
 
-        self._print_progress(f"\n  Track {track_id}: Starting (score={best_score:.2f})")
+        self._print_progress(f"\n  Track {track_id}: Starting (score={initial_score:.2f})")
 
         # Refinement loop
         for iteration in range(1, self.config.max_iterations_per_track + 1):
@@ -153,6 +155,9 @@ class RefinementStage(BaseStage):
                 db_prompt.average_score = new_score
                 context.prompt_repo.save(db_prompt)
 
+            # Track the current iteration's score
+            current_score = new_score
+
             # Check for improvement
             improvement = (new_score - best_score) / best_score if best_score > 0 else 0
 
@@ -176,12 +181,18 @@ class RefinementStage(BaseStage):
                 self._print_progress(f"  Track {track_id}: Early stopping")
                 break
 
-        # Print final stats
-        final_improvement = best_score - (initial_prompt.average_score or 0)
-        self._print_progress(
-            f"  Track {track_id}: Complete (final={best_score:.2f}, "
-            f"improvement=+{final_improvement:.2f})"
-        )
+        # Print final stats showing progression: initial → last iteration (and best if different)
+        final_change = current_score - initial_score
+        if current_score != best_score:
+            self._print_progress(
+                f"  Track {track_id}: Complete ({initial_score:.2f} → {current_score:.2f}, "
+                f"best={best_score:.2f}, change={final_change:+.2f})"
+            )
+        else:
+            self._print_progress(
+                f"  Track {track_id}: Complete ({initial_score:.2f} → {current_score:.2f}, "
+                f"change={final_change:+.2f})"
+            )
 
     async def _analyze_weaknesses(self, prompt: PromptCandidate, context: RunContext) -> dict:
         """

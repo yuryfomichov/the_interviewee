@@ -173,7 +173,9 @@ class ReportingStage(BaseStage):
             # Convert to Pydantic and extract metrics
             pydantic_prompts = [PromptConverter.from_db(p) for p in track_prompts]
             initial_prompt = pydantic_prompts[0]
-            final_prompt = max(pydantic_prompts, key=lambda p: p.average_score or 0)
+            # final_prompt should be the LAST iteration, not the best scoring one
+            # (track comparison shows progression: initial → final)
+            final_prompt = pydantic_prompts[-1]
             score_progression = [p.average_score or 0 for p in pydantic_prompts]
             improvement = (final_prompt.average_score or 0) - (initial_prompt.average_score or 0)
 
