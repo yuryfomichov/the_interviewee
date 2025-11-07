@@ -142,27 +142,27 @@ class Config:
     @property
     def chunk_size(self) -> int:
         """Get document chunk size."""
-        return self.get("rag.chunk_size", 800)
+        return int(self.get("rag.chunk_size", 800))
 
     @property
     def chunk_overlap(self) -> int:
         """Get chunk overlap size."""
-        return self.get("rag.chunk_overlap", 200)
+        return int(self.get("rag.chunk_overlap", 200))
 
     @property
     def top_k(self) -> int:
         """Get number of top documents to retrieve."""
-        return self.get("rag.top_k", 5)
+        return int(self.get("rag.top_k", 5))
 
     @property
     def relevance_threshold(self) -> float:
         """Get relevance score threshold."""
-        return self.get("rag.relevance_threshold", 0.5)
+        return float(self.get("rag.relevance_threshold", 0.5))
 
     @property
     def embedding_model(self) -> str:
         """Get embedding model name."""
-        return self.get("rag.embedding_model", "BAAI/bge-base-en-v1.5")
+        return str(self.get("rag.embedding_model", "BAAI/bge-base-en-v1.5"))
 
     # Data configuration properties
     @property
@@ -186,7 +186,7 @@ class Config:
     @property
     def rebuild_index(self) -> bool:
         """Check if vector index should be rebuilt."""
-        return self.get("data.rebuild_index", False)
+        return bool(self.get("data.rebuild_index", False))
 
     # User configuration properties
     @property
@@ -201,24 +201,26 @@ class Config:
         default_title = (
             f"{self.user_name} - Interviewee" if self.user_name != "User" else "AI Interviewee"
         )
-        return self.get("ui.title", default_title)
+        return str(self.get("ui.title", default_title))
 
     @property
     def ui_description(self) -> str:
         """Get UI description."""
-        return self.get(
-            "ui.description", "Ask me questions about my professional background and experience."
+        return str(
+            self.get(
+                "ui.description", "Ask me questions about my professional background and experience."
+            )
         )
 
     @property
     def show_examples(self) -> bool:
         """Check if example questions should be shown."""
-        return self.get("ui.show_examples", True)
+        return bool(self.get("ui.show_examples", True))
 
     @property
     def enable_history(self) -> bool:
         """Check if conversation history should be enabled."""
-        return self.get("ui.enable_history", True)
+        return bool(self.get("ui.enable_history", True))
 
     # Launcher configuration
     @property
