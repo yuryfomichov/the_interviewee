@@ -2,9 +2,9 @@
 
 import logging
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
@@ -77,23 +77,23 @@ class Database:
                 forbidden_columns = {'current_stage'}  # Removed in refactoring
 
                 if not required_columns.issubset(columns):
-                    logger.warning(f"Schema incompatible: missing required columns in optimization_runs")
+                    logger.warning("Schema incompatible: missing required columns in optimization_runs")
                     return False
 
                 if forbidden_columns.intersection(columns):
-                    logger.warning(f"Schema incompatible: found old columns that should be removed")
+                    logger.warning("Schema incompatible: found old columns that should be removed")
                     return False
 
             # Check if prompts table exists and has run_id column
             if "prompts" in inspector.get_table_names():
                 columns = {col['name'] for col in inspector.get_columns("prompts")}
                 if 'run_id' not in columns:
-                    logger.warning(f"Schema incompatible: prompts table missing run_id column")
+                    logger.warning("Schema incompatible: prompts table missing run_id column")
                     return False
 
             # Check that stage_results table does NOT exist (removed in refactoring)
             if "stage_results" in inspector.get_table_names():
-                logger.warning(f"Schema incompatible: stage_results table exists but should be removed")
+                logger.warning("Schema incompatible: stage_results table exists but should be removed")
                 return False
 
             return True
@@ -106,7 +106,7 @@ class Database:
         # Check if existing schema is compatible
         if not self._check_schema_compatible():
             logger.warning(f"Incompatible database schema detected at {self.db_path}")
-            logger.warning(f"Dropping old database and creating new schema...")
+            logger.warning("Dropping old database and creating new schema...")
 
             # Close any connections
             self.engine.dispose()
