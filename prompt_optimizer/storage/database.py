@@ -1,12 +1,14 @@
 """Database session management and initialization."""
 
 import logging
+import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from prompt_optimizer.storage.models import Base
@@ -54,8 +56,81 @@ class Database:
 
         logger.info(f"Database initialized at {self.db_path}")
 
+    def _check_schema_compatible(self) -> bool:
+        """
+        Check if the existing database schema is compatible with current models.
+
+        Returns:
+            True if schema is compatible or DB doesn't exist, False if incompatible
+        """
+        if not self.db_path.exists():
+            return True
+
+        try:
+            inspector = inspect(self.engine)
+
+            # Check if optimization_runs table has the correct structure
+            if "optimization_runs" in inspector.get_table_names():
+                columns = {col['name'] for col in inspector.get_columns("optimization_runs")}
+                # Check for required columns that should exist in new schema
+                required_columns = {'id', 'task_description', 'started_at', 'status'}
+                # Check for columns that should NOT exist in new schema
+                forbidden_columns = {'current_stage'}  # Removed in refactoring
+
+                if not required_columns.issubset(columns):
+                    logger.warning(f"Schema incompatible: missing required columns in optimization_runs")
+                    return False
+
+                if forbidden_columns.intersection(columns):
+                    logger.warning(f"Schema incompatible: found old columns that should be removed")
+                    return False
+
+            # Check if prompts table exists and has run_id column
+            if "prompts" in inspector.get_table_names():
+                columns = {col['name'] for col in inspector.get_columns("prompts")}
+                if 'run_id' not in columns:
+                    logger.warning(f"Schema incompatible: prompts table missing run_id column")
+                    return False
+
+            # Check that stage_results table does NOT exist (removed in refactoring)
+            if "stage_results" in inspector.get_table_names():
+                logger.warning(f"Schema incompatible: stage_results table exists but should be removed")
+                return False
+
+            return True
+        except Exception as e:
+            logger.warning(f"Error checking schema compatibility: {e}")
+            return False
+
     def _init_db(self) -> None:
-        """Create all tables."""
+        """Create all tables, recreating DB if schema is incompatible."""
+        # Check if existing schema is compatible
+        if not self._check_schema_compatible():
+            logger.warning(f"Incompatible database schema detected at {self.db_path}")
+            logger.warning(f"Dropping old database and creating new schema...")
+
+            # Close any connections
+            self.engine.dispose()
+
+            # Delete old database file
+            if self.db_path.exists():
+                backup_path = self.db_path.with_suffix('.db.old')
+                logger.info(f"Backing up old database to {backup_path}")
+                os.rename(self.db_path, backup_path)
+
+            # Recreate engine
+            self.engine = create_engine(
+                f"sqlite:///{self.db_path}",
+                echo=False,
+                connect_args={"check_same_thread": False},
+            )
+            self.SessionLocal = sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=self.engine,
+            )
+
+        # Create all tables
         Base.metadata.create_all(bind=self.engine)
         self._create_indexes()
 
