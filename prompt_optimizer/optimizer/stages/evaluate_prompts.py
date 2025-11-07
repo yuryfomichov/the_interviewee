@@ -95,6 +95,20 @@ class EvaluatePromptsStage(BaseStage):
             f"Evaluation complete (scores: {scores_display}...)"
         )
 
+        # Display original prompt score if present (helpful context before selection)
+        if self.stage_name == "quick_filter":
+            original_db_prompt = context.prompt_repo.get_original_prompt(context.run_id)
+            if original_db_prompt:
+                original_pydantic = PromptConverter.from_db(original_db_prompt)
+                if original_pydantic.quick_score is not None:
+                    # Calculate rank among all prompts
+                    all_scores = sorted([getattr(p, score_field) for p in prompts if getattr(p, score_field) is not None], reverse=True)
+                    rank = all_scores.index(original_pydantic.quick_score) + 1 if original_pydantic.quick_score in all_scores else None
+                    rank_display = f" (rank {rank}/{len(all_scores)})" if rank else ""
+                    self._print_progress(
+                        f"Original prompt: {original_pydantic.quick_score:.2f}{rank_display}"
+                    )
+
         return context
 
     async def _run_sync(self, context: RunContext) -> RunContext:
@@ -148,6 +162,20 @@ class EvaluatePromptsStage(BaseStage):
         self._print_progress(
             f"Evaluation complete (scores: {scores_display}...)"
         )
+
+        # Display original prompt score if present (helpful context before selection)
+        if self.stage_name == "quick_filter":
+            original_db_prompt = context.prompt_repo.get_original_prompt(context.run_id)
+            if original_db_prompt:
+                original_pydantic = PromptConverter.from_db(original_db_prompt)
+                if original_pydantic.quick_score is not None:
+                    # Calculate rank among all prompts
+                    all_scores = sorted([getattr(p, score_field) for p in prompts if getattr(p, score_field) is not None], reverse=True)
+                    rank = all_scores.index(original_pydantic.quick_score) + 1 if original_pydantic.quick_score in all_scores else None
+                    rank_display = f" (rank {rank}/{len(all_scores)})" if rank else ""
+                    self._print_progress(
+                        f"Original prompt: {original_pydantic.quick_score:.2f}{rank_display}"
+                    )
 
         return context
 
