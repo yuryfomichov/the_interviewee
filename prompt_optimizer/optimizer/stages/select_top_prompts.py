@@ -49,9 +49,11 @@ class SelectTopPromptsStage(BaseStage):
         # Convert to Pydantic for display
         top_prompts = [PromptConverter.from_db(p) for p in db_top_prompts]
 
+        # Display using the appropriate score field for this selection type
+        score_field = "quick_score" if self.selection_type == "quick" else "rigorous_score"
+        scores_display = [f'{getattr(p, score_field):.2f}' for p in top_prompts if getattr(p, score_field) is not None]
         self._print_progress(
-            f"\nTop {self.top_n} prompts selected "
-            f"(scores: {[f'{p.average_score:.2f}' for p in top_prompts]})"
+            f"\nTop {self.top_n} prompts selected (scores: {scores_display})"
         )
 
         return context

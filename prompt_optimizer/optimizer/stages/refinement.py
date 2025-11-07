@@ -103,7 +103,8 @@ class RefinementStage(BaseStage):
 
         # Initialize tracking variables
         current_prompt = initial_prompt
-        initial_score = current_prompt.average_score or 0
+        # Refinement evaluates on rigorous tests, so use rigorous_score
+        initial_score = current_prompt.rigorous_score or 0
         best_score = initial_score
         current_score = initial_score
         no_improvement_count = 0
@@ -151,12 +152,13 @@ class RefinementStage(BaseStage):
                 parallel=True,
                 semaphore=semaphore,
             )
-            refined_prompt.average_score = new_score
+            # Refinement evaluates on rigorous tests, so store in rigorous_score
+            refined_prompt.rigorous_score = new_score
 
             # Update prompt score in database
             db_prompt = context.prompt_repo.get_by_id(refined_prompt.id)
             if db_prompt:
-                db_prompt.average_score = new_score
+                db_prompt.rigorous_score = new_score
                 context.prompt_repo.save(db_prompt)
 
             # Track the current iteration's score

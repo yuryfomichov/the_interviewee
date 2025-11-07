@@ -49,10 +49,13 @@ class PromptRepository:
         Returns:
             List of prompts ordered by score descending
         """
+        # Order by the appropriate score field based on stage
+        score_field = Prompt.quick_score if stage == "quick_filter" else Prompt.rigorous_score
+
         return (
             self.session.query(Prompt)
             .filter(Prompt.run_id == run_id, Prompt.stage == stage)
-            .order_by(Prompt.average_score.desc().nullslast())
+            .order_by(score_field.desc().nullslast())
             .all()
         )
 
@@ -68,10 +71,13 @@ class PromptRepository:
         Returns:
             List of top K prompts
         """
+        # Order by the appropriate score field based on stage
+        score_field = Prompt.quick_score if stage == "quick_filter" else Prompt.rigorous_score
+
         return (
             self.session.query(Prompt)
             .filter(Prompt.run_id == run_id, Prompt.stage == stage)
-            .order_by(Prompt.average_score.desc().nullslast())
+            .order_by(score_field.desc().nullslast())
             .limit(k)
             .all()
         )
