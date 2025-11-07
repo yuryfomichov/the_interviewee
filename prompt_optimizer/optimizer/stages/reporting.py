@@ -156,7 +156,14 @@ class ReportingStage(BaseStage):
             p for p in all_prompts if p.iteration == 0 and p.quick_score is not None
         ]
         db_top_k_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
-        db_top_m_prompts = context.prompt_repo.get_by_stage(context.run_id, "rigorous")
+        # Get top M prompts that were SELECTED for refinement (have track_id set)
+        # This excludes prompts evaluated rigorously but not selected (like original prompt for comparison)
+        db_top_m_prompts = [
+            p for p in all_prompts
+            if p.iteration == 0 and p.track_id is not None and p.rigorous_score is not None
+        ]
+        # Sort by rigorous score descending
+        db_top_m_prompts.sort(key=lambda p: p.rigorous_score or 0, reverse=True)
         db_quick_tests = context.test_repo.get_by_stage(context.run_id, "quick")
         db_rigorous_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
 
