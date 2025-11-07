@@ -155,24 +155,35 @@ def create_fake_test_designer_response(agent) -> TestCasesOutput:
     seed = int(hashlib.md5(instructions.encode()).hexdigest()[:8], 16)
     rng = random.Random(seed)
 
-    # Parse distribution (simplified - look for numbers in instructions)
-    # For more accuracy, could parse the actual distribution dict
-    # Default distribution
-    distribution = {
-        "core": 20,
-        "edge": 10,
-        "boundary": 10,
-        "adversarial": 5,
-        "consistency": 3,
-        "format": 2,
-    }
+    # Parse distribution from instructions
+    # Instructions contain lines like: "- **core**: EXACTLY 2 tests (description)"
+    distribution = {}
+    import re
 
-    # Try to detect if this is quick or rigorous
-    if "quick" in instructions.lower() or "7 test cases" in instructions:
-        distribution = {"core": 2, "edge": 2, "boundary": 1, "adversarial": 1, "consistency": 1, "format": 0}
+    for category in ["core", "edge", "boundary", "adversarial", "consistency", "format"]:
+        # Look for pattern: "- **category**: EXACTLY N tests"
+        pattern = rf"-\s*\*\*{category}\*\*:\s*EXACTLY\s+(\d+)\s+tests?"
+        match = re.search(pattern, instructions, re.IGNORECASE)
+        if match:
+            count = int(match.group(1))
+            distribution[category] = count
+
+    # Fallback to default if parsing failed
+    if not distribution or sum(distribution.values()) == 0:
+        # Default distribution
+        distribution = {
+            "core": 20,
+            "edge": 10,
+            "boundary": 10,
+            "adversarial": 5,
+            "consistency": 3,
+            "format": 2,
+        }
 
     test_cases = []
     for category, count in distribution.items():
+        if count == 0:
+            continue
         for i in range(count):
             test_id = f"test_{category}_{i}_{uuid.uuid4().hex[:6]}"
 

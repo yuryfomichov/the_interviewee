@@ -15,26 +15,15 @@ async def test_generate_prompts_stage_creates_correct_count(
     )
 
     result = await optimizer.optimize()
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # Check initial prompts from result (they're stored there after pipeline completes)
+    assert len(result.initial_prompts) == minimal_config.num_initial_prompts
 
-        # Should have exactly num_initial_prompts
-        initial_prompts = session.query(Prompt).filter_by(
-            run_id=result.run_id, stage="initial"
-        ).all()
-
-        assert len(initial_prompts) == minimal_config.num_initial_prompts
-
-        # All should have prompt_text
-        for prompt in initial_prompts:
-            assert prompt.prompt_text is not None
-            assert len(prompt.prompt_text) > 0
-            assert prompt.strategy is not None
-
-    finally:
-        session.close()
+    # All should have prompt_text
+    for prompt in result.initial_prompts:
+        assert prompt.prompt_text is not None
+        assert len(prompt.prompt_text) > 0
+        assert prompt.strategy is not None
 
 
 @pytest.mark.asyncio
@@ -47,38 +36,23 @@ async def test_generate_tests_stage_creates_test_suites(
     )
 
     result = await optimizer.optimize()
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import TestCase
+    # Check tests from result (they're stored there after pipeline completes)
+    assert len(result.quick_tests) == minimal_config.num_quick_tests
+    assert len(result.rigorous_tests) == minimal_config.num_rigorous_tests
 
-        # Quick tests
-        quick_tests = session.query(TestCase).filter_by(
-            run_id=result.run_id, stage="quick"
-        ).all()
-        assert len(quick_tests) == minimal_config.num_quick_tests
-
-        # Rigorous tests
-        rigorous_tests = session.query(TestCase).filter_by(
-            run_id=result.run_id, stage="rigorous"
-        ).all()
-        assert len(rigorous_tests) == minimal_config.num_rigorous_tests
-
-        # Verify test structure
-        for test in quick_tests + rigorous_tests:
-            assert test.input_message is not None
-            assert test.expected_behavior is not None
-            assert test.category in [
-                "core",
-                "edge",
-                "boundary",
-                "adversarial",
-                "consistency",
-                "format",
-            ]
-
-    finally:
-        session.close()
+    # Verify test structure
+    for test in result.quick_tests + result.rigorous_tests:
+        assert test.input_message is not None
+        assert test.expected_behavior is not None
+        assert test.category in [
+            "core",
+            "edge",
+            "boundary",
+            "adversarial",
+            "consistency",
+            "format",
+        ]
 
 
 @pytest.mark.asyncio

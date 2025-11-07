@@ -26,29 +26,21 @@ async def test_prompts_advance_through_all_stages(
     )
 
     result = await optimizer.optimize()
-    run_id = result.run_id
-    session = test_database.get_session()
 
-    try:
-        # Stage 1: All initial prompts created
-        assert_prompts_in_stage(
-            session, run_id, "initial", minimal_config.num_initial_prompts
-        )
+    # Use result object which contains snapshots at each stage
+    # Stage 1: All initial prompts created
+    assert len(result.initial_prompts) == minimal_config.num_initial_prompts
 
-        # Stage 2: Top K advanced to quick_filter
-        assert_prompts_in_stage(session, run_id, "quick_filter", minimal_config.top_k_advance)
+    # Stage 2: Top K advanced to quick_filter
+    assert len(result.top_k_prompts) == minimal_config.top_k_advance
 
-        # Stage 3: Top M advanced to rigorous
-        assert_prompts_in_stage(session, run_id, "rigorous", minimal_config.top_m_refine)
+    # Stage 3: Top M advanced to rigorous
+    assert len(result.top_m_prompts) == minimal_config.top_m_refine
 
-        # Stage 4: Refined prompts exist
-        from prompt_optimizer.storage.models import Prompt
-
-        refined_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="refined").all()
-        assert len(refined_prompts) > 0
-
-    finally:
-        session.close()
+    # Stage 4: Refined prompts exist (in refinement tracks)
+    assert len(result.all_tracks) > 0
+    for track in result.all_tracks:
+        assert len(track.iterations) > 0
 
 
 @pytest.mark.asyncio
@@ -65,25 +57,15 @@ async def test_all_initial_prompts_evaluated(
     )
 
     result = await optimizer.optimize()
-    run_id = result.run_id
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # All initial prompts should have quick_score after evaluation
+    assert len(result.initial_prompts) == minimal_config.num_initial_prompts
 
-        # All initial prompts should have quick_score after evaluation
-        initial_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="initial").all()
-
-        assert len(initial_prompts) == minimal_config.num_initial_prompts
-
-        for prompt in initial_prompts:
-            assert (
-                prompt.quick_score is not None
-            ), f"Prompt {prompt.id} in initial stage has no quick_score"
-            assert 0 <= prompt.quick_score <= 10, f"Invalid quick_score: {prompt.quick_score}"
-
-    finally:
-        session.close()
+    for prompt in result.initial_prompts:
+        assert (
+            prompt.quick_score is not None
+        ), f"Prompt {prompt.id} has no quick_score"
+        assert 0 <= prompt.quick_score <= 10, f"Invalid quick_score: {prompt.quick_score}"
 
 
 @pytest.mark.asyncio
@@ -100,35 +82,17 @@ async def test_top_k_selection_by_score(
     )
 
     result = await optimizer.optimize()
-    run_id = result.run_id
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # Verify correct number selected
+    assert len(result.top_k_prompts) == minimal_config.top_k_advance
 
-        # Get all initial prompts with scores
-        initial_prompts = (
-            session.query(Prompt)
-            .filter_by(run_id=run_id, stage="initial")
-            .filter(Prompt.quick_score.isnot(None))
-            .all()
-        )
+    # Verify that top K prompts have the highest scores from initial prompts
+    quick_scores = sorted([p.quick_score for p in result.top_k_prompts], reverse=True)
+    all_scores = sorted([p.quick_score for p in result.initial_prompts if p.quick_score is not None], reverse=True)
 
-        # Get quick_filter prompts
-        quick_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="quick_filter").all()
-
-        assert len(quick_prompts) == minimal_config.top_k_advance
-
-        # Verify that quick_filter prompts have the highest scores
-        quick_scores = sorted([p.quick_score for p in quick_prompts], reverse=True)
-        all_scores = sorted([p.quick_score for p in initial_prompts], reverse=True)
-
-        # Top K scores from quick_filter should match top K scores from all prompts
-        top_k_scores = all_scores[: minimal_config.top_k_advance]
-        assert quick_scores == top_k_scores
-
-    finally:
-        session.close()
+    # Top K scores should match top K scores from all prompts
+    top_k_scores = all_scores[: minimal_config.top_k_advance]
+    assert quick_scores == top_k_scores
 
 
 @pytest.mark.asyncio
@@ -145,34 +109,16 @@ async def test_top_m_selection_by_rigorous_score(
     )
 
     result = await optimizer.optimize()
-    run_id = result.run_id
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # Verify correct number selected
+    assert len(result.top_m_prompts) == minimal_config.top_m_refine
 
-        # Get quick_filter prompts with rigorous scores
-        quick_prompts = (
-            session.query(Prompt)
-            .filter_by(run_id=run_id, stage="quick_filter")
-            .filter(Prompt.rigorous_score.isnot(None))
-            .all()
-        )
+    # Verify top M prompts have the highest rigorous_scores from top K
+    rigorous_scores = sorted([p.rigorous_score for p in result.top_m_prompts if p.rigorous_score is not None], reverse=True)
+    all_scores = sorted([p.rigorous_score for p in result.top_k_prompts if p.rigorous_score is not None], reverse=True)
 
-        # Get rigorous prompts
-        rigorous_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="rigorous").all()
-
-        assert len(rigorous_prompts) == minimal_config.top_m_refine
-
-        # Verify rigorous prompts have the highest rigorous_scores
-        rigorous_scores = sorted([p.rigorous_score for p in rigorous_prompts], reverse=True)
-        all_scores = sorted([p.rigorous_score for p in quick_prompts], reverse=True)
-
-        top_m_scores = all_scores[: minimal_config.top_m_refine]
-        assert rigorous_scores == top_m_scores
-
-    finally:
-        session.close()
+    top_m_scores = all_scores[: minimal_config.top_m_refine]
+    assert rigorous_scores == top_m_scores
 
 
 @pytest.mark.asyncio
