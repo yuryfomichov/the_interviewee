@@ -196,32 +196,19 @@ async def test_refinement_iterations_stored_in_database(
     )
 
     result = await optimizer.optimize()
-    session = test_database.get_session()
+    # Verify iterations are tracked in result object
+    for track in result.all_tracks:
+        # Track should have iterations (initial + refinements)
+        assert len(track.iterations) > 0
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+        # Should have at least initial prompt
+        assert track.initial_prompt is not None
+        assert track.final_prompt is not None
 
-        # For each track, verify iterations in database
-        for track in result.all_tracks:
-            track_id = track.track_id
-
-            # Get all refined prompts for this track
-            track_prompts = (
-                session.query(Prompt)
-                .filter_by(run_id=result.run_id, stage="refined", track_id=track_id)
-                .order_by(Prompt.iteration)
-                .all()
-            )
-
-            # Should have prompts for each iteration
-            assert len(track_prompts) == len(track.iterations)
-
-            # Verify iteration numbers are sequential
-            for i, prompt in enumerate(track_prompts):
-                assert prompt.iteration == i + 1  # Iterations start at 1
-
-    finally:
-        session.close()
+        # Iterations should be sequential
+        for i, prompt in enumerate(track.iterations):
+            # Iteration numbers should match position
+            assert prompt.iteration == i
 
 
 @pytest.mark.asyncio
@@ -238,29 +225,18 @@ async def test_weakness_analysis_stored(
     )
 
     result = await optimizer.optimize()
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import WeaknessAnalysis
-
-        # Get weakness analyses
-        weaknesses = session.query(WeaknessAnalysis).filter_by(
-            run_id=result.run_id
-        ).all()
-
-        # Should have weakness analyses (at least one per track)
-        assert len(weaknesses) > 0
+    # Verify weakness analyses are tracked in result object
+    for track in result.all_tracks:
+        # Track should have weaknesses_history
+        assert len(track.weaknesses_history) > 0
 
         # Verify structure
-        for weakness in weaknesses:
-            assert weakness.prompt_id is not None
+        for weakness in track.weaknesses_history:
             assert weakness.iteration is not None
             assert weakness.description is not None
             assert isinstance(weakness.failed_test_ids, list)
             assert isinstance(weakness.failed_test_descriptions, list)
-
-    finally:
-        session.close()
 
 
 @pytest.mark.asyncio

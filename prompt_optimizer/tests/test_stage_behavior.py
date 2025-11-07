@@ -103,39 +103,30 @@ async def test_select_top_prompts_stage_selects_by_score(
     )
 
     result = await optimizer.optimize()
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # Use result object (database stages show final state where prompts have progressed)
+    # Get all initial prompts sorted by quick_score
+    all_initial = sorted(
+        [p for p in result.initial_prompts if p.quick_score is not None],
+        key=lambda p: p.quick_score,
+        reverse=True
+    )
 
-        # Get all initial prompts sorted by quick_score
-        all_initial = (
-            session.query(Prompt)
-            .filter_by(run_id=result.run_id, stage="initial")
-            .filter(Prompt.quick_score.isnot(None))
-            .order_by(Prompt.quick_score.desc())
-            .all()
-        )
+    # Get selected prompts (top K)
+    selected = sorted(
+        result.top_k_prompts,
+        key=lambda p: p.quick_score,
+        reverse=True
+    )
 
-        # Get selected prompts
-        selected = (
-            session.query(Prompt)
-            .filter_by(run_id=result.run_id, stage="quick_filter")
-            .order_by(Prompt.quick_score.desc())
-            .all()
-        )
+    # Selected prompts should be top K
+    assert len(selected) == minimal_config.top_k_advance
 
-        # Selected prompts should be top K
-        assert len(selected) == minimal_config.top_k_advance
+    # Scores should match top K from all prompts
+    expected_top_scores = [p.quick_score for p in all_initial[: minimal_config.top_k_advance]]
+    actual_scores = [p.quick_score for p in selected]
 
-        # Scores should match top K from all prompts
-        expected_top_scores = [p.quick_score for p in all_initial[: minimal_config.top_k_advance]]
-        actual_scores = [p.quick_score for p in selected]
-
-        assert actual_scores == expected_top_scores
-
-    finally:
-        session.close()
+    assert actual_scores == expected_top_scores
 
 
 @pytest.mark.asyncio

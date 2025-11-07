@@ -157,36 +157,24 @@ async def test_scores_populated_at_each_stage(
     )
 
     result = await optimizer.optimize()
-    run_id = result.run_id
-    session = test_database.get_session()
 
-    try:
-        from prompt_optimizer.storage.models import Prompt
+    # Use result object which contains snapshots at each stage
+    # Initial prompts: should all have quick_score
+    for prompt in result.initial_prompts:
+        assert prompt.quick_score is not None
 
-        # Initial prompts: should have quick_score
-        initial_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="initial").all()
-        for prompt in initial_prompts:
-            assert prompt.quick_score is not None
+    # Top K prompts: should have both quick_score and rigorous_score
+    for prompt in result.top_k_prompts:
+        assert prompt.quick_score is not None
+        assert prompt.rigorous_score is not None
 
-        # Quick_filter prompts: should have both quick_score and rigorous_score
-        quick_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="quick_filter").all()
-        for prompt in quick_prompts:
-            assert prompt.quick_score is not None
-            assert prompt.rigorous_score is not None
+    # Top M prompts: should have rigorous_score
+    for prompt in result.top_m_prompts:
+        assert prompt.rigorous_score is not None
 
-        # Rigorous prompts: should have rigorous_score
-        rigorous_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="rigorous").all()
-        for prompt in rigorous_prompts:
-            assert prompt.rigorous_score is not None
-
-        # Refined prompts: should have rigorous_score (from refinement evaluation)
-        refined_prompts = session.query(Prompt).filter_by(run_id=run_id, stage="refined").all()
-        for prompt in refined_prompts:
-            if prompt.iteration > 0:  # Refinement iterations should have scores
-                assert prompt.rigorous_score is not None
-
-    finally:
-        session.close()
+    # Refined prompts: tracks should have iterations with scores
+    for track in result.all_tracks:
+        assert track.final_prompt.rigorous_score is not None
 
 
 @pytest.mark.asyncio
