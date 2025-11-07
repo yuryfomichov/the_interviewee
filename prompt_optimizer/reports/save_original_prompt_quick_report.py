@@ -42,6 +42,9 @@ async def save_original_prompt_quick_report(
     # Create test case mapping
     test_case_map = {test.id: test for test in quick_tests}
 
+    # Filter test results to only include quick tests
+    quick_test_results = [tr for tr in test_results if tr.test_case_id in test_case_map]
+
     # Determine ranking
     sorted_prompts = sorted(initial_prompts, key=lambda p: p.average_score or 0, reverse=True)
     rank = next((i + 1 for i, p in enumerate(sorted_prompts) if p.id == original_prompt.id), None)
@@ -50,21 +53,24 @@ async def save_original_prompt_quick_report(
     top_k_ids = {p.id for p in top_k_prompts}
     advanced = original_prompt.id in top_k_ids
 
+    # Calculate score from the quick test results shown in this report
+    quick_score = sum(tr.evaluation.overall for tr in quick_test_results) / len(quick_test_results) if quick_test_results else 0.0
+
     lines = []
     lines.append("ORIGINAL SYSTEM PROMPT - QUICK TEST REPORT\n")
     lines.append("=" * 70 + "\n\n")
 
     lines.append("SUMMARY\n")
     lines.append("-" * 70 + "\n")
-    lines.append(f"Score: {original_prompt.average_score:.2f}/10\n")
+    lines.append(f"Score: {quick_score:.2f}/10\n")
     lines.append(f"Rank: {rank}/{len(initial_prompts)} among initial prompts\n")
     lines.append(f"Status: {'✓ ADVANCED to rigorous testing' if advanced else '✗ FILTERED OUT'}\n")
-    lines.append(f"Total Quick Tests: {len(test_results)}\n\n")
+    lines.append(f"Total Quick Tests: {len(quick_test_results)}\n\n")
 
     # Performance breakdown
-    if test_results:
+    if quick_test_results:
         scores_by_category: dict[str, list[float]] = {}
-        for test_result in test_results:
+        for test_result in quick_test_results:
             test_case = test_case_map.get(test_result.test_case_id)
             if test_case:
                 category = test_case.category
@@ -88,7 +94,7 @@ async def save_original_prompt_quick_report(
 
     # Group by category
     by_category: dict[str, list[tuple]] = {}
-    for test_result in test_results:
+    for test_result in quick_test_results:
         test_case = test_case_map.get(test_result.test_case_id)
         if test_case:
             category = test_case.category
