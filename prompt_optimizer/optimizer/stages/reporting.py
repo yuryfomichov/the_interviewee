@@ -8,7 +8,6 @@ from prompt_optimizer.schemas import (
     OptimizationResult,
     PromptCandidate,
     RefinementTrackResult,
-    TestCase,
     TestResult,
 )
 from prompt_optimizer.storage import (
@@ -142,8 +141,7 @@ class ReportingStage(BaseStage):
         # Note: Can't use stage="initial" because prompts advance to "quick_filter" after evaluation
         all_prompts = context.prompt_repo.get_all_for_run(context.run_id)
         db_initial_prompts = [
-            p for p in all_prompts
-            if p.iteration == 0 and p.quick_score is not None
+            p for p in all_prompts if p.iteration == 0 and p.quick_score is not None
         ]
         db_top_k_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
         db_top_m_prompts = context.prompt_repo.get_by_stage(context.run_id, "rigorous")
@@ -188,7 +186,7 @@ class ReportingStage(BaseStage):
             # Get weaknesses for this track
             db_weaknesses = []
             for p in track_prompts:
-                if hasattr(p, 'weaknesses'):
+                if hasattr(p, "weaknesses"):
                     db_weaknesses.extend(p.weaknesses)
             weaknesses_history = [WeaknessAnalysisConverter.from_db(w) for w in db_weaknesses]
 

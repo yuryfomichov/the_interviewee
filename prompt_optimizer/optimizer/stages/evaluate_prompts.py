@@ -14,7 +14,13 @@ class EvaluatePromptsStage(BaseStage):
 
     stage_name: Literal["quick_filter", "rigorous"]
 
-    def __init__(self, stage_name: Literal["quick_filter", "rigorous"], top_k: int | None = None, *args, **kwargs):
+    def __init__(
+        self,
+        stage_name: Literal["quick_filter", "rigorous"],
+        top_k: int | None = None,
+        *args,
+        **kwargs,
+    ):
         """
         Initialize evaluation stage.
 
@@ -74,7 +80,9 @@ class EvaluatePromptsStage(BaseStage):
         scores = await asyncio.gather(*eval_tasks)
 
         # Update prompts with scores and save to database
-        self._update_and_save_prompt_scores(context, prompts, scores, original_prompt_for_comparison)
+        self._update_and_save_prompt_scores(
+            context, prompts, scores, original_prompt_for_comparison
+        )
 
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
@@ -123,7 +131,9 @@ class EvaluatePromptsStage(BaseStage):
             scores.append(avg_score)
 
         # Update prompts with scores and save to database
-        self._update_and_save_prompt_scores(context, prompts, scores, original_prompt_for_comparison)
+        self._update_and_save_prompt_scores(
+            context, prompts, scores, original_prompt_for_comparison
+        )
 
         # Report original prompt comparison if applicable
         self._report_original_prompt_comparison(original_prompt_for_comparison)
@@ -156,7 +166,9 @@ class EvaluatePromptsStage(BaseStage):
         else:  # rigorous
             # Get top K prompts from quick_filter stage (limit if top_k specified)
             if self.top_k is not None:
-                db_prompts = context.prompt_repo.get_top_k(context.run_id, "quick_filter", self.top_k)
+                db_prompts = context.prompt_repo.get_top_k(
+                    context.run_id, "quick_filter", self.top_k
+                )
             else:
                 db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
             db_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
@@ -178,7 +190,7 @@ class EvaluatePromptsStage(BaseStage):
         return prompts, tests, original_prompt_for_comparison
 
     def _update_and_save_prompt_scores(
-        self, context: RunContext, prompts: list, scores: list[float], comparison_prompt = None
+        self, context: RunContext, prompts: list, scores: list[float], comparison_prompt=None
     ) -> None:
         """
         Update prompts with scores and save to database.
@@ -193,10 +205,7 @@ class EvaluatePromptsStage(BaseStage):
             prompt.average_score = avg_score
 
             # Check if this is a comparison-only prompt (should not advance)
-            is_comparison_only = (
-                comparison_prompt is not None
-                and prompt.id == comparison_prompt.id
-            )
+            is_comparison_only = comparison_prompt is not None and prompt.id == comparison_prompt.id
 
             if is_comparison_only:
                 # This prompt was added for comparison only - don't update its stage
@@ -219,7 +228,9 @@ class EvaluatePromptsStage(BaseStage):
             db_prompt = PromptConverter.to_db(prompt, context.run_id)
             context.prompt_repo.save(db_prompt)
 
-    def _report_original_prompt_comparison(self, original_prompt_for_comparison: object | None) -> None:
+    def _report_original_prompt_comparison(
+        self, original_prompt_for_comparison: object | None
+    ) -> None:
         """
         Report original prompt comparison if applicable.
 

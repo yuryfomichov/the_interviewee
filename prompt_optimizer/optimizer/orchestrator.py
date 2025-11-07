@@ -135,7 +135,7 @@ class PromptOptimizer:
                 context = await stage.run(context)
 
             # Get the optimization result created by ReportingStage
-            if not hasattr(context, '_optimization_result'):
+            if not hasattr(context, "_optimization_result"):
                 raise RuntimeError("ReportingStage did not create optimization result")
 
             return context._optimization_result  # type: ignore

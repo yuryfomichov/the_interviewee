@@ -49,7 +49,9 @@ class Prompt(Base):
     rigorous_score: Mapped[float | None] = mapped_column(default=None)
     iteration: Mapped[int] = mapped_column(default=0)
     track_id: Mapped[int | None] = mapped_column(default=None)
-    parent_prompt_id: Mapped[str | None] = mapped_column(ForeignKey("prompts.id"), default=None)  # Refinement lineage
+    parent_prompt_id: Mapped[str | None] = mapped_column(
+        ForeignKey("prompts.id"), default=None
+    )  # Refinement lineage
     is_original_system_prompt: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
@@ -57,7 +59,9 @@ class Prompt(Base):
     run: Mapped[OptimizationRun] = relationship(back_populates="prompts", foreign_keys=[run_id])
     parent: Mapped[Prompt | None] = relationship(remote_side=[id], backref="children")
     evaluations: Mapped[list[Evaluation]] = relationship(back_populates="prompt")
-    weaknesses: Mapped[list[WeaknessAnalysis]] = relationship(back_populates="prompt", order_by="WeaknessAnalysis.iteration")
+    weaknesses: Mapped[list[WeaknessAnalysis]] = relationship(
+        back_populates="prompt", order_by="WeaknessAnalysis.iteration"
+    )
 
 
 class TestCase(Base):

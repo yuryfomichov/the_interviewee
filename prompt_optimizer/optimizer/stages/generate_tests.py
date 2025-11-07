@@ -67,7 +67,9 @@ class GenerateTestsStage(BaseStage):
         tests = self._parse_test_cases(test_result.final_output)
 
         # Save all test cases to database
-        db_tests = [TestCaseConverter.to_db(test, context.run_id, self.test_stage) for test in tests]
+        db_tests = [
+            TestCaseConverter.to_db(test, context.run_id, self.test_stage) for test in tests
+        ]
         context.test_repo.save_many(db_tests)
 
         self._print_progress(f"Generated {len(tests)} {self.test_stage} test cases")

@@ -90,7 +90,9 @@ class EvaluationRepository:
             .all()
         )
 
-    def get_failed_tests_for_prompt(self, prompt_id: str, threshold: float = 7.0) -> list[Evaluation]:
+    def get_failed_tests_for_prompt(
+        self, prompt_id: str, threshold: float = 7.0
+    ) -> list[Evaluation]:
         """
         Get all failed evaluations for a prompt.
 

@@ -40,7 +40,9 @@ class SelectTopPromptsStage(BaseStage):
         # Query top N prompts from database based on selection type
         if self.selection_type == "quick":
             # Get top K from quick_filter stage
-            db_top_prompts = context.prompt_repo.get_top_k(context.run_id, "quick_filter", self.top_n)
+            db_top_prompts = context.prompt_repo.get_top_k(
+                context.run_id, "quick_filter", self.top_n
+            )
         else:  # rigorous
             # Get top M from rigorous stage
             db_top_prompts = context.prompt_repo.get_top_k(context.run_id, "rigorous", self.top_n)
@@ -61,11 +63,14 @@ class SelectTopPromptsStage(BaseStage):
 
                 # Query data needed for report
                 # Note: After quick_filter evaluation, prompts have stage="quick_filter", not "initial"
-                initial_db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
+                initial_db_prompts = context.prompt_repo.get_by_stage(
+                    context.run_id, "quick_filter"
+                )
                 quick_db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
 
                 # Convert to Pydantic
                 from prompt_optimizer.storage import TestCaseConverter
+
                 original_prompt = PromptConverter.from_db(original_db_prompt)
                 initial_prompts = [PromptConverter.from_db(p) for p in initial_db_prompts]
                 quick_tests = [TestCaseConverter.from_db(t) for t in quick_db_tests]

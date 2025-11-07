@@ -132,7 +132,9 @@ class OptimizationResult(BaseModel):
     run_id: int | None = Field(default=None, description="Identifier for the storage run")
     output_dir: str | None = Field(default=None, description="Directory where results were saved")
     best_prompt: PromptCandidate = Field(description="Champion prompt")
-    all_tracks: list[RefinementTrackResult] = Field(description="Results from all refinement tracks")
+    all_tracks: list[RefinementTrackResult] = Field(
+        description="Results from all refinement tracks"
+    )
     initial_prompts: list[PromptCandidate] = Field(description="All initially generated prompts")
     top_k_prompts: list[PromptCandidate] = Field(description="Top K prompts from quick filter")
     top_m_prompts: list[PromptCandidate] = Field(description="Top M prompts from rigorous testing")

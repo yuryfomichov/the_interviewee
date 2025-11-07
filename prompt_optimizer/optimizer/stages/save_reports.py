@@ -33,7 +33,7 @@ class SaveReportsStage(BaseStage):
         Returns:
             Unchanged context (reports saved to disk)
         """
-        if not hasattr(context, '_optimization_result'):
+        if not hasattr(context, "_optimization_result"):
             raise ValueError("_optimization_result must be set in context by ReportingStage")
         if context.output_dir is None:
             raise ValueError("output_dir must be set in context")
@@ -67,7 +67,7 @@ class SaveReportsStage(BaseStage):
         Returns:
             Unchanged context (reports saved to disk)
         """
-        if not hasattr(context, '_optimization_result'):
+        if not hasattr(context, "_optimization_result"):
             raise ValueError("_optimization_result must be set in context by ReportingStage")
         if context.output_dir is None:
             raise ValueError("output_dir must be set in context")

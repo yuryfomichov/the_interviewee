@@ -1,20 +1,25 @@
 """Convert between Pydantic models and SQLAlchemy models."""
 
 import json
-from datetime import datetime
 
 from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
-    TestCase as PydanticTestCase,
     TestResult,
+)
+from prompt_optimizer.schemas import (
+    TestCase as PydanticTestCase,
+)
+from prompt_optimizer.schemas import (
     WeaknessAnalysis as PydanticWeakness,
 )
 from prompt_optimizer.storage.models import (
     Evaluation,
     Prompt,
-    TestCase as DbTestCase,
     WeaknessAnalysis,
+)
+from prompt_optimizer.storage.models import (
+    TestCase as DbTestCase,
 )
 
 

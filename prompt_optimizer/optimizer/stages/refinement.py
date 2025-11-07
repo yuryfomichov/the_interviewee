@@ -32,7 +32,9 @@ class RefinementStage(BaseStage):
             Updated context (refined prompts saved to database)
         """
         # Query top M prompts from rigorous stage
-        db_prompts = context.prompt_repo.get_top_k(context.run_id, "rigorous", self.config.top_m_refine)
+        db_prompts = context.prompt_repo.get_top_k(
+            context.run_id, "rigorous", self.config.top_m_refine
+        )
         prompts = [PromptConverter.from_db(p) for p in db_prompts]
 
         self._print_progress(f"Launching {len(prompts)} parallel refinement tracks...")
@@ -60,7 +62,9 @@ class RefinementStage(BaseStage):
             Updated context (refined prompts saved to database)
         """
         # Query top M prompts from rigorous stage
-        db_prompts = context.prompt_repo.get_top_k(context.run_id, "rigorous", self.config.top_m_refine)
+        db_prompts = context.prompt_repo.get_top_k(
+            context.run_id, "rigorous", self.config.top_m_refine
+        )
         prompts = [PromptConverter.from_db(p) for p in db_prompts]
 
         self._print_progress(f"Running {len(prompts)} refinement tracks sequentially...")
@@ -288,7 +292,9 @@ class RefinementStage(BaseStage):
         )
         return self._parse_refined_prompt(refinement_result.final_output)
 
-    def _create_refined_prompt(self, track_id: int, iteration: int, refined_text: str) -> PromptCandidate:
+    def _create_refined_prompt(
+        self, track_id: int, iteration: int, refined_text: str
+    ) -> PromptCandidate:
         """
         Create a new refined prompt candidate.
 

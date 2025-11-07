@@ -70,14 +70,16 @@ class Database:
 
             # Check if optimization_runs table has the correct structure
             if "optimization_runs" in inspector.get_table_names():
-                columns = {col['name'] for col in inspector.get_columns("optimization_runs")}
+                columns = {col["name"] for col in inspector.get_columns("optimization_runs")}
                 # Check for required columns that should exist in new schema
-                required_columns = {'id', 'task_description', 'started_at', 'status'}
+                required_columns = {"id", "task_description", "started_at", "status"}
                 # Check for columns that should NOT exist in new schema
-                forbidden_columns = {'current_stage'}  # Removed in refactoring
+                forbidden_columns = {"current_stage"}  # Removed in refactoring
 
                 if not required_columns.issubset(columns):
-                    logger.warning("Schema incompatible: missing required columns in optimization_runs")
+                    logger.warning(
+                        "Schema incompatible: missing required columns in optimization_runs"
+                    )
                     return False
 
                 if forbidden_columns.intersection(columns):
@@ -86,14 +88,16 @@ class Database:
 
             # Check if prompts table exists and has run_id column
             if "prompts" in inspector.get_table_names():
-                columns = {col['name'] for col in inspector.get_columns("prompts")}
-                if 'run_id' not in columns:
+                columns = {col["name"] for col in inspector.get_columns("prompts")}
+                if "run_id" not in columns:
                     logger.warning("Schema incompatible: prompts table missing run_id column")
                     return False
 
             # Check that stage_results table does NOT exist (removed in refactoring)
             if "stage_results" in inspector.get_table_names():
-                logger.warning("Schema incompatible: stage_results table exists but should be removed")
+                logger.warning(
+                    "Schema incompatible: stage_results table exists but should be removed"
+                )
                 return False
 
             return True
@@ -113,7 +117,7 @@ class Database:
 
             # Delete old database file
             if self.db_path.exists():
-                backup_path = self.db_path.with_suffix('.db.old')
+                backup_path = self.db_path.with_suffix(".db.old")
                 logger.info(f"Backing up old database to {backup_path}")
                 os.rename(self.db_path, backup_path)
 
@@ -137,13 +141,29 @@ class Database:
         """Create additional indexes for performance."""
         with self.engine.begin() as conn:
             # Indexes for common queries
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_run_stage ON prompts(run_id, stage)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_score ON prompts(average_score DESC)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_prompts_track ON prompts(run_id, track_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_prompt ON evaluations(prompt_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_evaluations_test ON evaluations(test_case_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_test_cases_run_stage ON test_cases(run_id, stage)"))
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_prompts_run_stage ON prompts(run_id, stage)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_prompts_score ON prompts(average_score DESC)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_prompts_track ON prompts(run_id, track_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_evaluations_prompt ON evaluations(prompt_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_evaluations_test ON evaluations(test_case_id)")
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_test_cases_run_stage ON test_cases(run_id, stage)"
+                )
+            )
 
     def get_session(self) -> Session:
         """
@@ -155,7 +175,7 @@ class Database:
         return self.SessionLocal()
 
     @contextmanager
-    def session_scope(self) -> Generator[Session, None, None]:
+    def session_scope(self) -> Generator[Session]:
         """
         Provide a transactional scope around a series of operations.
 
