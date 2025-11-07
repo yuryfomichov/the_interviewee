@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 from sqlalchemy.orm import Session
 
 from prompt_optimizer.storage.repositories import (
@@ -37,14 +37,11 @@ class RunContext(BaseModel):
     start_time: float = Field(description="When optimization started (unix timestamp)")
     output_dir: str = Field(description="Directory for saving reports and artifacts")
 
-    # Database session (not serialized, set at runtime)
-    _session: Any = Field(default=None, exclude=True)
+    # Database session (private attribute, not a field)
+    _session: Any = PrivateAttr(default=None)
+    _optimization_result: Any = PrivateAttr(default=None)
 
-    class Config:
-        """Pydantic config."""
-
-        arbitrary_types_allowed = True
-        underscore_attrs_are_private = True
+    model_config = {"arbitrary_types_allowed": True}
 
     # === Repository access helpers ===
 
