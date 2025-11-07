@@ -29,11 +29,19 @@ async def save_original_prompt_rigorous_results(
     # Create a mapping of test_case_id to test case for easy lookup
     test_case_map = {test.id: test for test in result.rigorous_tests}
 
+    # Check if original prompt advanced to refinement (compare by ID)
+    top_m_ids = {p.id for p in result.top_m_prompts}
+    advanced = result.original_system_prompt.id in top_m_ids
+
     lines = []
     lines.append("ORIGINAL SYSTEM PROMPT - RIGOROUS TEST RESULTS\n")
     lines.append("=" * 70 + "\n")
     lines.append(f"Prompt ID: {result.original_system_prompt.id}\n")
     lines.append(f"Overall Score: {result.original_system_prompt_rigorous_score:.2f}/10\n")
+    if advanced:
+        lines.append("Status: ✓ ADVANCED to refinement\n")
+    else:
+        lines.append("Status: For comparison only, did not advance\n")
     lines.append(f"Total Tests: {len(result.original_system_prompt_test_results)}\n")
     lines.append("=" * 70 + "\n\n")
 
