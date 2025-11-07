@@ -189,14 +189,26 @@ class EvaluatePromptsStage(BaseStage):
             scores: List of average scores corresponding to prompts
         """
         for prompt, avg_score in zip(prompts, scores, strict=True):
+            # Get existing prompt from DB to preserve stage if needed
+            existing_db_prompt = context.prompt_repo.get_by_id(prompt.id)
+
             prompt.average_score = avg_score
-            prompt.stage = self.stage_name
-            # Store scores in dedicated fields for original prompt to preserve both
-            if prompt.is_original_system_prompt:
-                if self.stage_name == "quick_filter":
-                    prompt.quick_score = avg_score
-                else:  # rigorous
-                    prompt.rigorous_score = avg_score
+
+            # For rigorous stage: DO NOT update stage for original prompt if it's just for comparison
+            # (it should stay at its current stage so it won't be selected for refinement)
+            if self.stage_name == "rigorous" and prompt.is_original_system_prompt:
+                # Keep the original prompt at its current stage (don't advance it)
+                if existing_db_prompt:
+                    prompt.stage = existing_db_prompt.stage  # Preserve existing stage
+                # But still store the rigorous score for reporting
+                prompt.rigorous_score = avg_score
+            else:
+                # For all other prompts, update the stage normally
+                prompt.stage = self.stage_name
+                # Store scores in dedicated fields for original prompt
+                if prompt.is_original_system_prompt:
+                    if self.stage_name == "quick_filter":
+                        prompt.quick_score = avg_score
 
             # Save to database
             db_prompt = PromptConverter.to_db(prompt, context.run_id)
