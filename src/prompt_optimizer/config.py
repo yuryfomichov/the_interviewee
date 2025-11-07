@@ -9,7 +9,7 @@ Adjust these values for faster testing during development:
 """
 
 from prompt_optimizer.config import LLMConfig, OptimizerConfig, TestDistribution
-from prompt_optimizer.types import TaskSpec
+from prompt_optimizer.schemas import TaskSpec
 from prompts import get_default_system_prompt
 
 

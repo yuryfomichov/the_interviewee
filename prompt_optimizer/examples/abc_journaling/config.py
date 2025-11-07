@@ -49,7 +49,7 @@ Expected behavior:
 def create_optimizer_config(api_key: str) -> OptimizerConfig:
     """Create optimizer configuration tuned for the journaling assistant."""
     return OptimizerConfig(
-        num_initial_prompts=3,
+        num_initial_prompts=5,
         quick_test_distribution=TestDistribution(
             core=1,
             edge=1,
@@ -58,7 +58,7 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
             consistency=0,
             format=0,
         ),
-        top_k_advance=1,
+        top_k_advance=2,
         rigorous_test_distribution=TestDistribution(
             core=1,
             edge=1,
@@ -67,7 +67,7 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
             consistency=1,
             format=1,
         ),
-        top_m_refine=1,
+        top_m_refine=2,
         max_iterations_per_track=2,
         convergence_threshold=0.02,
         early_stopping_patience=1,
@@ -83,7 +83,7 @@ def create_optimizer_config(api_key: str) -> OptimizerConfig:
         refiner_llm=LLMConfig(model="gpt-5-nano"),
         output_dir="prompt_optimizer/examples/abc_journaling/prompt_optimizer_data",
         parallel_execution=True,
-        max_concurrent_evaluations=15,
+        max_concurrent_evaluations=20,
         verbose=True,
         openai_api_key=api_key,
         task_spec=create_task_spec(),
