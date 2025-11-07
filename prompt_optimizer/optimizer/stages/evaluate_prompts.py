@@ -14,16 +14,18 @@ class EvaluatePromptsStage(BaseStage):
 
     stage_name: Literal["quick_filter", "rigorous"]
 
-    def __init__(self, stage_name: Literal["quick_filter", "rigorous"], *args, **kwargs):
+    def __init__(self, stage_name: Literal["quick_filter", "rigorous"], top_k: int | None = None, *args, **kwargs):
         """
         Initialize evaluation stage.
 
         Args:
             stage_name: Name for the evaluation stage (e.g., "quick_filter", "rigorous")
+            top_k: Optional limit on number of prompts to evaluate (for rigorous stage)
             *args, **kwargs: Passed to BaseStage
         """
         super().__init__(*args, **kwargs)
         self.stage_name = stage_name
+        self.top_k = top_k
 
     @property
     def name(self) -> str:
@@ -152,8 +154,11 @@ class EvaluatePromptsStage(BaseStage):
             db_prompts = context.prompt_repo.get_by_stage(context.run_id, "initial")
             db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
         else:  # rigorous
-            # Get top K prompts from quick_filter stage
-            db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
+            # Get top K prompts from quick_filter stage (limit if top_k specified)
+            if self.top_k is not None:
+                db_prompts = context.prompt_repo.get_top_k(context.run_id, "quick_filter", self.top_k)
+            else:
+                db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
             db_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
 
             # For rigorous evaluation, check if we need to evaluate original prompt for comparison

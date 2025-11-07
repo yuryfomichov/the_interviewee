@@ -1,13 +1,9 @@
 """SQLAlchemy ORM models for prompt optimizer storage."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import declarative_base, relationship
-
-if TYPE_CHECKING:
-    from typing import List
 
 Base = declarative_base()
 

@@ -1,13 +1,8 @@
 """Repository for TestCase data access."""
 
-from typing import TYPE_CHECKING
-
 from sqlalchemy.orm import Session
 
 from prompt_optimizer.storage.models import TestCase
-
-if TYPE_CHECKING:
-    from typing import List
 
 
 class TestCaseRepository:

@@ -130,8 +130,11 @@ class RefinementStage(BaseStage):
                 iteration,
             )
 
-            # Create and evaluate refined prompt
+            # Create refined prompt and save to database FIRST (before evaluation)
             refined_prompt = self._create_refined_prompt(track_id, iteration, refined_text)
+            self._save_refined_prompt(context, refined_prompt, parent_prompt_id)
+
+            # Now evaluate (evaluations need the prompt to exist in DB due to foreign key)
             new_score = await evaluate_prompt(
                 refined_prompt,
                 rigorous_tests,
@@ -144,8 +147,11 @@ class RefinementStage(BaseStage):
             )
             refined_prompt.average_score = new_score
 
-            # Save refined prompt to database
-            self._save_refined_prompt(context, refined_prompt, parent_prompt_id)
+            # Update prompt score in database
+            db_prompt = context.prompt_repo.get_by_id(refined_prompt.id)
+            if db_prompt:
+                db_prompt.average_score = new_score
+                context.prompt_repo.save(db_prompt)
 
             # Check for improvement
             improvement = (new_score - best_score) / best_score if best_score > 0 else 0

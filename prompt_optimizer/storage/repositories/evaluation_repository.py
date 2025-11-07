@@ -1,13 +1,8 @@
 """Repository for Evaluation data access."""
 
-from typing import TYPE_CHECKING
-
 from sqlalchemy.orm import Session, joinedload
 
 from prompt_optimizer.storage.models import Evaluation
-
-if TYPE_CHECKING:
-    from typing import List
 
 
 class EvaluationRepository:

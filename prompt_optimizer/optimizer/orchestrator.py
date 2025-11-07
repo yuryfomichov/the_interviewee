@@ -78,8 +78,8 @@ class PromptOptimizer:
             SelectTopPromptsStage(self.config.top_k_advance, "quick", **stage_kwargs),
             # Stage 5: Generate rigorous tests
             GenerateTestsStage("rigorous", **stage_kwargs),
-            # Stage 6: Evaluate with rigorous tests
-            EvaluatePromptsStage("rigorous", **stage_kwargs),
+            # Stage 6: Evaluate with rigorous tests (only top K from quick filter)
+            EvaluatePromptsStage("rigorous", top_k=self.config.top_k_advance, **stage_kwargs),
             # Stage 7: Select top M
             SelectTopPromptsStage(self.config.top_m_refine, "rigorous", **stage_kwargs),
             # Stage 8: Parallel refinement

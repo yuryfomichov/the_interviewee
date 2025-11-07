@@ -1,14 +1,10 @@
 """Repository for OptimizationRun data access."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
 from prompt_optimizer.storage.models import OptimizationRun
-
-if TYPE_CHECKING:
-    from typing import List
 
 
 class RunRepository:

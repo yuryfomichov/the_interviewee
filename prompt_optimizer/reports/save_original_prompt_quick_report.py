@@ -44,8 +44,9 @@ def save_original_prompt_quick_report(
     sorted_prompts = sorted(initial_prompts, key=lambda p: p.average_score or 0, reverse=True)
     rank = next((i + 1 for i, p in enumerate(sorted_prompts) if p.id == original_prompt.id), None)
 
-    # Check if advanced
-    advanced = original_prompt in top_k_prompts
+    # Check if advanced (compare by ID, not object identity)
+    top_k_ids = {p.id for p in top_k_prompts}
+    advanced = original_prompt.id in top_k_ids
 
     with report_file.open("w") as f:
         f.write("ORIGINAL SYSTEM PROMPT - QUICK TEST REPORT\n")
