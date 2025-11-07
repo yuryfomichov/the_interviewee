@@ -1,6 +1,7 @@
 # Justfile for prompt optimizer tests
 # Install just: https://github.com/casey/just
 # Usage: just <command>
+# NOTE: Run from the_interviewee directory (parent of prompt_optimizer)
 
 # List available commands
 default:
@@ -8,36 +9,36 @@ default:
 
 # Run all tests
 test:
-    pytest tests/ -v
+    python -m pytest prompt_optimizer/tests/ -v
 
 # Run with verbose output
 test-verbose:
-    pytest tests/ -vv -s
+    python -m pytest prompt_optimizer/tests/ -vv -s
 
 # Run with coverage report
 test-coverage:
-    pytest tests/ --cov=prompt_optimizer --cov-report=term-missing --cov-report=html
+    python -m pytest prompt_optimizer/tests/ --cov=prompt_optimizer --cov-report=term-missing --cov-report=html
     @echo "\nCoverage report: htmlcov/index.html"
 
 # Run only fast tests (minimal config)
 test-fast:
-    pytest tests/ -v -k "minimal"
+    python -m pytest prompt_optimizer/tests/ -v -k "minimal"
 
 # Run all tests including realistic configs
 test-full:
-    pytest tests/ -v --durations=10
+    python -m pytest prompt_optimizer/tests/ -v --durations=10
 
 # Run a specific test file
 test-file FILE:
-    pytest tests/{{FILE}} -vv -s
+    python -m pytest prompt_optimizer/tests/{{FILE}} -vv -s
 
 # Run a specific test by name pattern
 test-match PATTERN:
-    pytest tests/ -vv -s -k "{{PATTERN}}"
+    python -m pytest prompt_optimizer/tests/ -vv -s -k "{{PATTERN}}"
 
 # Watch mode - rerun tests on file changes (requires pytest-watch)
 test-watch:
-    ptw tests/ -- -v
+    ptw prompt_optimizer/tests/ -- -v
 
 # Clean test artifacts
 clean:
