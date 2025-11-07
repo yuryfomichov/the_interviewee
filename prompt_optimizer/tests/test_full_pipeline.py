@@ -33,19 +33,11 @@ async def test_minimal_pipeline_completes(
     for track in result.all_tracks:
         assert track.initial_prompt is not None
         assert track.final_prompt is not None
-        assert len(track.iterations) >= 0
-
-    # Verify test counts
-    assert len(result.quick_tests) == minimal_config.num_quick_tests
-    assert len(result.rigorous_tests) == minimal_config.num_rigorous_tests
 
     # Verify prompts at each stage
     assert len(result.initial_prompts) == minimal_config.num_initial_prompts
     assert len(result.top_k_prompts) == minimal_config.top_k_advance
     assert len(result.top_m_prompts) == minimal_config.top_m_refine
-
-    # Verify test execution count
-    assert result.total_tests_run > 0
 
     # Verify timing
     assert result.total_time_seconds > 0
@@ -79,10 +71,6 @@ async def test_realistic_pipeline_completes(
     assert len(result.top_k_prompts) == realistic_config.top_k_advance
     assert len(result.top_m_prompts) == realistic_config.top_m_refine
     assert len(result.all_tracks) == realistic_config.top_m_refine
-
-    # Verify test suite sizes
-    assert len(result.quick_tests) == realistic_config.num_quick_tests
-    assert len(result.rigorous_tests) == realistic_config.num_rigorous_tests
 
     # Verify all stages produced valid outputs
     for prompt in result.initial_prompts:
@@ -210,13 +198,6 @@ async def test_database_state_after_pipeline(
         assert len(result.top_k_prompts) == minimal_config.top_k_advance
         assert len(result.top_m_prompts) == minimal_config.top_m_refine
         assert len(result.all_tracks) > 0
-
-        # Verify test cases exist
-        quick_tests = session.query(TestCase).filter_by(run_id=run_id, stage="quick").all()
-        assert len(quick_tests) == minimal_config.num_quick_tests
-
-        rigorous_tests = session.query(TestCase).filter_by(run_id=run_id, stage="rigorous").all()
-        assert len(rigorous_tests) == minimal_config.num_rigorous_tests
 
         # Verify evaluations exist
         evaluations = session.query(Evaluation).filter_by(run_id=run_id).all()

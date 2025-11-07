@@ -56,7 +56,7 @@ def dummy_connector():
     This replaces the real model connector (e.g., OpenAI) with a fake
     that generates responses instantly without API calls.
     """
-    return DummyConnector(seed=42)
+    return DummyConnector()
 
 
 @pytest.fixture
