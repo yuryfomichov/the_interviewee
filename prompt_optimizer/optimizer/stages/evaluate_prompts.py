@@ -7,6 +7,7 @@ from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.evaluation import evaluate_prompt
 from prompt_optimizer.storage import PromptConverter, TestCaseConverter
+from prompt_optimizer.storage.models import Prompt
 
 
 class EvaluatePromptsStage(BaseStage):
@@ -229,7 +230,7 @@ class EvaluatePromptsStage(BaseStage):
             context.prompt_repo.save(db_prompt)
 
     def _report_original_prompt_comparison(
-        self, original_prompt_for_comparison: object | None
+        self, original_prompt_for_comparison: Prompt | None
     ) -> None:
         """
         Report original prompt comparison if applicable.

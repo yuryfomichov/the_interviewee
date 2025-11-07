@@ -1,6 +1,7 @@
 """Convert between Pydantic models and SQLAlchemy models."""
 
 import json
+from typing import Literal, cast
 
 from prompt_optimizer.schemas import (
     EvaluationScore,
@@ -51,7 +52,9 @@ class PromptConverter:
         return PromptCandidate(
             id=prompt.id,
             prompt_text=prompt.prompt_text,
-            stage=prompt.stage,
+            stage=cast(
+                Literal["initial", "quick_filter", "rigorous", "refined"], prompt.stage
+            ),
             strategy=prompt.strategy,
             average_score=prompt.average_score,
             quick_score=prompt.quick_score,
@@ -85,7 +88,10 @@ class TestCaseConverter:
             id=test.id,
             input_message=test.input_message,
             expected_behavior=test.expected_behavior,
-            category=test.category,
+            category=cast(
+                Literal["core", "edge", "boundary", "adversarial", "consistency", "format"],
+                test.category,
+            ),
         )
 
 

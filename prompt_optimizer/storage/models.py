@@ -19,7 +19,7 @@ class OptimizationRun(Base):
 
     __tablename__ = "optimization_runs"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     task_description: Mapped[str] = mapped_column(Text)
     started_at: Mapped[datetime] = mapped_column(default=datetime.now)
     completed_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -87,7 +87,7 @@ class Evaluation(Base):
 
     __tablename__ = "evaluations"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("optimization_runs.id"))
     test_case_id: Mapped[str] = mapped_column(ForeignKey("test_cases.id"))
     prompt_id: Mapped[str] = mapped_column(ForeignKey("prompts.id"))
@@ -111,7 +111,7 @@ class WeaknessAnalysis(Base):
 
     __tablename__ = "weakness_analyses"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     prompt_id: Mapped[str] = mapped_column(ForeignKey("prompts.id"))
     iteration: Mapped[int]
     description: Mapped[str] = mapped_column(Text)

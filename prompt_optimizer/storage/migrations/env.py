@@ -2,7 +2,7 @@
 
 from logging.config import fileConfig
 
-from alembic import context
+from alembic import context  # type: ignore[import-untyped]
 from sqlalchemy import engine_from_config, pool
 
 from prompt_optimizer.storage.models import Base

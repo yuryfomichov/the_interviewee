@@ -9,7 +9,7 @@ Create Date: 2025-11-06
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
+from alembic import op  # type: ignore[import-untyped]
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"
