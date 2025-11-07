@@ -65,10 +65,16 @@ async def save_optimization_report(
     lines.append("TRACK RESULTS\n")
     lines.append("=" * 70 + "\n")
     for track in result.all_tracks:
+        # Calculate best score achieved (not just the final iteration)
+        best_score = max(track.score_progression) if track.score_progression else track.final_prompt.average_score
+        best_improvement = best_score - track.initial_prompt.average_score
+        best_iter = track.score_progression.index(best_score) if track.score_progression else 0
+
         lines.append(f"\nTrack {track.track_id}:\n")
         lines.append(f"  Initial: {track.initial_prompt.average_score:.2f}\n")
+        lines.append(f"  Best: {best_score:.2f} (iteration {best_iter})\n")
         lines.append(f"  Final: {track.final_prompt.average_score:.2f}\n")
-        lines.append(f"  Improvement: {track.improvement:+.2f}\n")
+        lines.append(f"  Best improvement: {best_improvement:+.2f}\n")
         lines.append(f"  Iterations: {len(track.iterations)}\n")
         lines.append(
             f"  Score progression: {', '.join(f'{s:.2f}' for s in track.score_progression)}\n"
