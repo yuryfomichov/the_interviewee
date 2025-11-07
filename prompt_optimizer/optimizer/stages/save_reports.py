@@ -11,6 +11,7 @@ from prompt_optimizer.reports import (
     save_optimization_report,
     save_original_prompt_quick_report,
     save_original_prompt_rigorous_results,
+    save_pipeline_report,
     save_prompts_json,
     save_testcases_json,
 )
@@ -48,6 +49,7 @@ class SaveReportsStage(BaseStage):
         tasks = [
             save_champion_prompt(result, output_dir),
             save_optimization_report(result, context.task_spec, output_dir),
+            save_pipeline_report(result, output_dir),
             save_champion_questions(result, output_dir),
             save_champion_qa_results(result, output_dir),
             save_original_prompt_rigorous_results(result, output_dir),
@@ -96,6 +98,7 @@ class SaveReportsStage(BaseStage):
         # Save all reports sequentially
         await save_champion_prompt(result, output_dir)
         await save_optimization_report(result, context.task_spec, output_dir)
+        await save_pipeline_report(result, output_dir)
         await save_champion_questions(result, output_dir)
         await save_champion_qa_results(result, output_dir)
         await save_original_prompt_rigorous_results(result, output_dir)
