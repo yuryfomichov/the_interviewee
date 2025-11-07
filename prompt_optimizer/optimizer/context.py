@@ -5,13 +5,13 @@ from typing import Any
 from pydantic import BaseModel, Field, PrivateAttr
 from sqlalchemy.orm import Session
 
+from prompt_optimizer.schemas import TaskSpec
 from prompt_optimizer.storage.repositories import (
     EvaluationRepository,
     PromptRepository,
     RunRepository,
     TestCaseRepository,
 )
-from prompt_optimizer.schemas import TaskSpec
 
 
 class RunContext(BaseModel):

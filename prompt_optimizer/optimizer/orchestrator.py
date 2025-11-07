@@ -16,8 +16,8 @@ from prompt_optimizer.optimizer.stages import (
     SaveReportsStage,
     SelectTopPromptsStage,
 )
-from prompt_optimizer.storage import Database
 from prompt_optimizer.schemas import OptimizationResult
+from prompt_optimizer.storage import Database
 
 logger = logging.getLogger(__name__)
 

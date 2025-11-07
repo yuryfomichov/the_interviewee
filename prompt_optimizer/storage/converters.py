@@ -3,18 +3,18 @@
 import json
 from datetime import datetime
 
-from prompt_optimizer.storage.models import (
-    Evaluation,
-    Prompt,
-    TestCase as DbTestCase,
-    WeaknessAnalysis,
-)
 from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
     TestCase as PydanticTestCase,
     TestResult,
     WeaknessAnalysis as PydanticWeakness,
+)
+from prompt_optimizer.storage.models import (
+    Evaluation,
+    Prompt,
+    TestCase as DbTestCase,
+    WeaknessAnalysis,
 )
 
 

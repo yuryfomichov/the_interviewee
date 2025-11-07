@@ -7,8 +7,8 @@ from agents import Runner
 from prompt_optimizer.agents.prompt_generator_agent import create_generator_agent
 from prompt_optimizer.optimizer.base_stage import BaseStage
 from prompt_optimizer.optimizer.context import RunContext
-from prompt_optimizer.storage import PromptConverter
 from prompt_optimizer.schemas import PromptCandidate
+from prompt_optimizer.storage import PromptConverter
 
 
 class GeneratePromptsStage(BaseStage):

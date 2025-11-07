@@ -10,7 +10,6 @@ from prompt_optimizer.connectors import BaseConnector
 from prompt_optimizer.optimizer.context import RunContext
 from prompt_optimizer.optimizer.utils.model_tester import test_target_model
 from prompt_optimizer.optimizer.utils.score_calculator import aggregate_prompt_score
-from prompt_optimizer.storage import EvaluationConverter
 from prompt_optimizer.schemas import (
     EvaluationScore,
     PromptCandidate,
@@ -18,6 +17,7 @@ from prompt_optimizer.schemas import (
     TestCase,
     TestResult,
 )
+from prompt_optimizer.storage import EvaluationConverter
 
 
 async def evaluate_prompt(
