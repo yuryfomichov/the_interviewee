@@ -42,7 +42,6 @@ def upgrade() -> None:
         sa.Column("prompt_text", sa.Text(), nullable=False),
         sa.Column("stage", sa.String(), nullable=False),
         sa.Column("strategy", sa.String(), nullable=True),
-        sa.Column("average_score", sa.Float(), nullable=True),
         sa.Column("quick_score", sa.Float(), nullable=True),
         sa.Column("rigorous_score", sa.Float(), nullable=True),
         sa.Column("iteration", sa.Integer(), nullable=False, server_default="0"),
@@ -127,8 +126,12 @@ def upgrade() -> None:
 
     # Create indexes for performance
     op.create_index("idx_prompts_run_stage", "prompts", ["run_id", "stage"])
+    # Separate indexes for quick_score and rigorous_score
     op.create_index(
-        "idx_prompts_score", "prompts", ["average_score"], postgresql_ops={"average_score": "DESC"}
+        "idx_prompts_quick_score", "prompts", ["quick_score"], postgresql_ops={"quick_score": "DESC"}
+    )
+    op.create_index(
+        "idx_prompts_rigorous_score", "prompts", ["rigorous_score"], postgresql_ops={"rigorous_score": "DESC"}
     )
     op.create_index("idx_prompts_track", "prompts", ["run_id", "track_id"])
     op.create_index("idx_evaluations_run", "evaluations", ["run_id"])

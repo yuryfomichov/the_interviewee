@@ -144,8 +144,12 @@ class Database:
             conn.execute(
                 text("CREATE INDEX IF NOT EXISTS idx_prompts_run_stage ON prompts(run_id, stage)")
             )
+            # Separate indexes for quick_score and rigorous_score for optimal query performance
             conn.execute(
-                text("CREATE INDEX IF NOT EXISTS idx_prompts_score ON prompts(average_score DESC)")
+                text("CREATE INDEX IF NOT EXISTS idx_prompts_quick_score ON prompts(quick_score DESC)")
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_prompts_rigorous_score ON prompts(rigorous_score DESC)")
             )
             conn.execute(
                 text("CREATE INDEX IF NOT EXISTS idx_prompts_track ON prompts(run_id, track_id)")
