@@ -122,10 +122,15 @@ class ReportingStage(BaseStage):
         Returns:
             Champion prompt with highest score
         """
-        # Get ALL prompts from refinement tracks (track_id is not None)
+        # Get ALL prompts from refinement tracks that went through rigorous evaluation
+        # - track_id is not None (assigned during refinement)
+        # - rigorous_score is not None (went through rigorous evaluation, not just quick)
         # Don't filter by stage because iteration 0 is "rigorous" not "refined"
         all_prompts = context.prompt_repo.get_all_for_run(context.run_id)
-        track_prompts = [p for p in all_prompts if p.track_id is not None]
+        track_prompts = [
+            p for p in all_prompts
+            if p.track_id is not None and p.rigorous_score is not None
+        ]
 
         if not track_prompts:
             raise ValueError("No refinement track prompts found!")
