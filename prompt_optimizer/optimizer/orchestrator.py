@@ -133,7 +133,6 @@ class PromptOptimizer:
             for idx, stage in enumerate(self.stages):
                 self._print_progress(f"\n[STAGE {idx + 1}] {stage.name}")
                 context = await stage.run(context)
-                run_repo.update_stage(run_id, stage.name)
 
             # Get the optimization result created by ReportingStage
             if not hasattr(context, '_optimization_result'):

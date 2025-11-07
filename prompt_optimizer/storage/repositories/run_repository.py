@@ -50,19 +50,6 @@ class RunRepository:
         """
         return self.session.query(OptimizationRun).filter(OptimizationRun.id == run_id).first()
 
-    def update_stage(self, run_id: int, stage: str) -> None:
-        """
-        Update the current stage of a run.
-
-        Args:
-            run_id: Run ID
-            stage: Stage name
-        """
-        run = self.get_by_id(run_id)
-        if run:
-            run.current_stage = stage
-            self.session.commit()
-
     def complete(
         self,
         run_id: int,
@@ -86,20 +73,6 @@ class RunRepository:
             run.total_tests_run = total_tests
             run.total_time_seconds = total_time
             run.status = "completed"
-            self.session.commit()
-
-    def mark_failed(self, run_id: int, error_message: str | None = None) -> None:
-        """
-        Mark a run as failed.
-
-        Args:
-            run_id: Run ID
-            error_message: Optional error message
-        """
-        run = self.get_by_id(run_id)
-        if run:
-            run.status = "failed"
-            run.completed_at = datetime.now()
             self.session.commit()
 
     def get_all(self, limit: int = 100) -> list[OptimizationRun]:

@@ -12,7 +12,6 @@ from prompt_optimizer.storage.models import (
     Evaluation,
     OptimizationRun,
     Prompt,
-    StageResult,
     TestCase,
     WeaknessAnalysis,
 )
@@ -30,7 +29,6 @@ __all__ = [
     "Prompt",
     "TestCase",
     "Evaluation",
-    "StageResult",
     "WeaknessAnalysis",
     "PromptRepository",
     "TestCaseRepository",

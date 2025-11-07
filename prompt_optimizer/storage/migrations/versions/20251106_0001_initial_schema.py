@@ -28,7 +28,6 @@ def upgrade() -> None:
         sa.Column('completed_at', sa.DateTime(), nullable=True),
         sa.Column('champion_prompt_id', sa.String(), nullable=True),
         sa.Column('total_tests_run', sa.Integer(), nullable=True),
-        sa.Column('current_stage', sa.String(), nullable=True),
         sa.Column('status', sa.String(), nullable=False, server_default='running'),
         sa.Column('total_time_seconds', sa.Float(), nullable=True),
         sa.PrimaryKeyConstraint('id')
@@ -90,21 +89,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
 
-    # Create stage_results table
-    op.create_table(
-        'stage_results',
-        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('run_id', sa.Integer(), nullable=False),
-        sa.Column('stage_name', sa.String(), nullable=False),
-        sa.Column('stage_number', sa.Integer(), nullable=False),
-        sa.Column('started_at', sa.DateTime(), nullable=False),
-        sa.Column('completed_at', sa.DateTime(), nullable=True),
-        sa.Column('status', sa.String(), nullable=False, server_default='running'),
-        sa.Column('metadata', sa.Text(), nullable=True),
-        sa.ForeignKeyConstraint(['run_id'], ['optimization_runs.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
-
     # Create weakness_analyses table
     op.create_table(
         'weakness_analyses',
@@ -127,7 +111,6 @@ def upgrade() -> None:
     op.create_index('idx_evaluations_prompt', 'evaluations', ['prompt_id'])
     op.create_index('idx_evaluations_test', 'evaluations', ['test_case_id'])
     op.create_index('idx_test_cases_run_stage', 'test_cases', ['run_id', 'stage'])
-    op.create_index('idx_stage_results_run', 'stage_results', ['run_id'])
     op.create_index('idx_weakness_analyses_prompt', 'weakness_analyses', ['prompt_id'])
 
     # Add foreign key for champion_prompt_id (must be added after prompts table exists)
@@ -145,7 +128,6 @@ def downgrade() -> None:
     op.drop_constraint('fk_optimization_runs_champion', 'optimization_runs', type_='foreignkey')
 
     op.drop_index('idx_weakness_analyses_prompt', table_name='weakness_analyses')
-    op.drop_index('idx_stage_results_run', table_name='stage_results')
     op.drop_index('idx_test_cases_run_stage', table_name='test_cases')
     op.drop_index('idx_evaluations_test', table_name='evaluations')
     op.drop_index('idx_evaluations_prompt', table_name='evaluations')
@@ -155,7 +137,6 @@ def downgrade() -> None:
     op.drop_index('idx_prompts_run_stage', table_name='prompts')
 
     op.drop_table('weakness_analyses')
-    op.drop_table('stage_results')
     op.drop_table('evaluations')
     op.drop_table('test_cases')
     op.drop_table('prompts')

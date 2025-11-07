@@ -23,7 +23,6 @@ class OptimizationRun(Base):
     completed_at = Column(DateTime, nullable=True)
     champion_prompt_id = Column(String, ForeignKey("prompts.id"), nullable=True)
     total_tests_run = Column(Integer, nullable=True)
-    current_stage = Column(String, nullable=True)  # Track current stage for resumption
     status = Column(String, default="running")  # running, completed, failed
     total_time_seconds = Column(Float, nullable=True)
 
@@ -31,7 +30,6 @@ class OptimizationRun(Base):
     prompts = relationship("Prompt", back_populates="run", foreign_keys="Prompt.run_id")
     test_cases = relationship("TestCase", back_populates="run")
     evaluations = relationship("Evaluation", back_populates="run")
-    stage_results = relationship("StageResult", back_populates="run", order_by="StageResult.stage_number")
 
 
 class Prompt(Base):
@@ -100,24 +98,6 @@ class Evaluation(Base):
     run = relationship("OptimizationRun", back_populates="evaluations")
     test_case = relationship("TestCase", back_populates="evaluations")
     prompt = relationship("Prompt", back_populates="evaluations")
-
-
-class StageResult(Base):
-    """Track completion of each pipeline stage."""
-
-    __tablename__ = "stage_results"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(Integer, ForeignKey("optimization_runs.id"), nullable=False)
-    stage_name = Column(String, nullable=False)
-    stage_number = Column(Integer, nullable=False)
-    started_at = Column(DateTime, nullable=False, default=datetime.now)
-    completed_at = Column(DateTime, nullable=True)
-    status = Column(String, default="running")  # running, completed, failed
-    metadata = Column(Text, nullable=True)  # JSON metadata (counts, etc.)
-
-    # Relationships
-    run = relationship("OptimizationRun", back_populates="stage_results")
 
 
 class WeaknessAnalysis(Base):
