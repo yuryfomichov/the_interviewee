@@ -45,16 +45,22 @@ async def save_original_prompt_quick_report(
     # Filter test results to only include quick tests
     quick_test_results = [tr for tr in test_results if tr.test_case_id in test_case_map]
 
-    # Determine ranking
-    sorted_prompts = sorted(initial_prompts, key=lambda p: p.average_score or 0, reverse=True)
+    # Calculate score from the quick test results
+    # If no quick test evaluations found, fall back to the prompt's quick_score field
+    if quick_test_results:
+        quick_score = sum(tr.evaluation.overall for tr in quick_test_results) / len(quick_test_results)
+    elif original_prompt.quick_score is not None:
+        quick_score = original_prompt.quick_score
+    else:
+        quick_score = 0.0
+
+    # Determine ranking based on quick_score (not average_score which includes rigorous tests)
+    sorted_prompts = sorted(initial_prompts, key=lambda p: p.quick_score or 0, reverse=True)
     rank = next((i + 1 for i, p in enumerate(sorted_prompts) if p.id == original_prompt.id), None)
 
     # Check if advanced (compare by ID, not object identity)
     top_k_ids = {p.id for p in top_k_prompts}
     advanced = original_prompt.id in top_k_ids
-
-    # Calculate score from the quick test results shown in this report
-    quick_score = sum(tr.evaluation.overall for tr in quick_test_results) / len(quick_test_results) if quick_test_results else 0.0
 
     lines = []
     lines.append("ORIGINAL SYSTEM PROMPT - QUICK TEST REPORT\n")
