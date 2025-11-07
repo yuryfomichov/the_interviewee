@@ -6,13 +6,28 @@ from prompt_optimizer.optimizer.orchestrator import PromptOptimizer
 
 
 @pytest.mark.asyncio
-async def test_top_k_selection_by_score(
-    minimal_config, dummy_connector, mock_agents, test_database
+@pytest.mark.parametrize(
+    "selected_attr,source_attr,count_attr,score_field,description",
+    [
+        ("top_k_prompts", "initial_prompts", "top_k_advance", "quick_score", "top-K from initial prompts"),
+        ("top_m_prompts", "top_k_prompts", "top_m_refine", "rigorous_score", "top-M from top-K prompts"),
+    ],
+)
+async def test_selection_by_score(
+    minimal_config,
+    dummy_connector,
+    mock_agents,
+    test_database,
+    selected_attr,
+    source_attr,
+    count_attr,
+    score_field,
+    description,
 ):
     """
-    Test that exactly top K prompts are selected based on quick_score.
+    Test that prompt selection correctly picks top N prompts by score.
 
-    The selected prompts should have the highest quick_scores.
+    Parameterized to test both top-K and top-M selection logic.
     """
     optimizer = PromptOptimizer(
         model_client=dummy_connector, config=minimal_config, database=test_database
@@ -20,42 +35,27 @@ async def test_top_k_selection_by_score(
 
     result = await optimizer.optimize()
 
+    # Get selected and source prompts
+    selected_prompts = getattr(result, selected_attr)
+    source_prompts = getattr(result, source_attr)
+    expected_count = getattr(minimal_config, count_attr)
+
     # Verify correct number selected
-    assert len(result.top_k_prompts) == minimal_config.top_k_advance
+    assert len(selected_prompts) == expected_count, f"Expected {expected_count} {description}"
 
-    # Verify that top K prompts have the highest scores from initial prompts
-    quick_scores = sorted([p.quick_score for p in result.top_k_prompts], reverse=True)
-    all_scores = sorted([p.quick_score for p in result.initial_prompts if p.quick_score is not None], reverse=True)
-
-    # Top K scores should match top K scores from all prompts
-    top_k_scores = all_scores[: minimal_config.top_k_advance]
-    assert quick_scores == top_k_scores
-
-
-@pytest.mark.asyncio
-async def test_top_m_selection_by_rigorous_score(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that exactly top M prompts are selected based on rigorous_score.
-
-    The selected prompts should have the highest rigorous_scores.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
+    # Verify selected prompts have the highest scores from source
+    selected_scores = sorted(
+        [getattr(p, score_field) for p in selected_prompts if getattr(p, score_field) is not None],
+        reverse=True,
+    )
+    all_scores = sorted(
+        [getattr(p, score_field) for p in source_prompts if getattr(p, score_field) is not None],
+        reverse=True,
     )
 
-    result = await optimizer.optimize()
-
-    # Verify correct number selected
-    assert len(result.top_m_prompts) == minimal_config.top_m_refine
-
-    # Verify top M prompts have the highest rigorous_scores from top K
-    rigorous_scores = sorted([p.rigorous_score for p in result.top_m_prompts if p.rigorous_score is not None], reverse=True)
-    all_scores = sorted([p.rigorous_score for p in result.top_k_prompts if p.rigorous_score is not None], reverse=True)
-
-    top_m_scores = all_scores[: minimal_config.top_m_refine]
-    assert rigorous_scores == top_m_scores
+    # Top N scores should match top N scores from all source prompts
+    top_n_scores = all_scores[:expected_count]
+    assert selected_scores == top_n_scores, f"Selected {description} don't have highest {score_field} values"
 
 
 @pytest.mark.asyncio

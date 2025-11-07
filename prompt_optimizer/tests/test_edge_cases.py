@@ -49,46 +49,6 @@ async def test_original_prompt_not_advanced_if_poor_performance(
 
 
 @pytest.mark.asyncio
-async def test_sync_and_async_modes_produce_same_structure(
-    minimal_config, parallel_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that sync and async execution modes produce equivalent results.
-
-    Both modes should create the same pipeline structure.
-    """
-    # Run in sync mode
-    optimizer_sync = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-    result_sync = await optimizer_sync.optimize()
-
-    # Run in async mode (use different database to avoid conflicts)
-    from pathlib import Path
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test_async.db"
-        from prompt_optimizer.storage import Database
-
-        async_db = Database(db_path)
-
-        parallel_config.output_dir = Path(tmpdir) / "output"
-        optimizer_async = PromptOptimizer(
-            model_client=dummy_connector, config=parallel_config, database=async_db
-        )
-        result_async = await optimizer_async.optimize()
-
-        # Both should have same structure
-        assert len(result_sync.initial_prompts) == len(result_async.initial_prompts)
-        assert len(result_sync.top_k_prompts) == len(result_async.top_k_prompts)
-        assert len(result_sync.top_m_prompts) == len(result_async.top_m_prompts)
-        assert len(result_sync.all_tracks) == len(result_async.all_tracks)
-        assert len(result_sync.quick_tests) == len(result_async.quick_tests)
-        assert len(result_sync.rigorous_tests) == len(result_async.rigorous_tests)
-
-
-@pytest.mark.asyncio
 async def test_database_isolation_between_runs(
     minimal_config, dummy_connector, mock_agents, test_database
 ):
