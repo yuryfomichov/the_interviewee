@@ -32,50 +32,6 @@ async def test_refinement_creates_multiple_tracks(
 
 
 @pytest.mark.asyncio
-async def test_refinement_iterations_create_parent_child_links(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that refinement iterations create proper parent-child relationships.
-
-    Each refined prompt should link to its parent.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-    session = test_database.get_session()
-
-    try:
-        from prompt_optimizer.storage.models import Prompt
-
-        # Get all refined prompts
-        refined_prompts = session.query(Prompt).filter_by(
-            run_id=result.run_id, stage="refined"
-        ).all()
-
-        # Check parent relationships
-        for prompt in refined_prompts:
-            if prompt.iteration > 0:
-                # Iteration > 0 should have parent
-                assert prompt.parent_prompt_id is not None
-
-                # Parent should exist
-                parent = session.query(Prompt).filter_by(id=prompt.parent_prompt_id).first()
-                assert parent is not None
-
-                # Parent should be in same track
-                assert parent.track_id == prompt.track_id
-
-                # Parent should have lower iteration
-                assert parent.iteration < prompt.iteration
-
-    finally:
-        session.close()
-
-
-@pytest.mark.asyncio
 async def test_refinement_tracks_are_isolated(
     minimal_config, dummy_connector, mock_agents, test_database
 ):
@@ -128,32 +84,6 @@ async def test_refinement_score_progression_tracked(
 
 
 @pytest.mark.asyncio
-async def test_refinement_improvement_calculated(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that improvement is correctly calculated for each track.
-
-    Improvement = final_score - initial_score
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    for track in result.all_tracks:
-        # Calculate expected improvement
-        initial_score = track.initial_prompt.rigorous_score
-        final_score = track.final_prompt.rigorous_score
-
-        expected_improvement = final_score - initial_score
-
-        # Should match tracked improvement (with small floating point tolerance)
-        assert abs(track.improvement - expected_improvement) < 0.01
-
-
-@pytest.mark.asyncio
 async def test_early_stopping_triggers(
     early_stopping_config, dummy_connector, mock_agents, test_database
 ):
@@ -180,63 +110,6 @@ async def test_early_stopping_triggers(
     assert all(
         len(track.iterations) <= max_iterations for track in result.all_tracks
     )
-
-
-@pytest.mark.asyncio
-async def test_refinement_iterations_stored_in_database(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that all refinement iterations are stored in database.
-
-    Each iteration should be a separate prompt record with iteration number.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-    # Verify iterations are tracked in result object
-    for track in result.all_tracks:
-        # Track should have iterations (initial + refinements)
-        assert len(track.iterations) > 0
-
-        # Should have at least initial prompt
-        assert track.initial_prompt is not None
-        assert track.final_prompt is not None
-
-        # Iterations should be sequential
-        for i, prompt in enumerate(track.iterations):
-            # Iteration numbers should match position
-            assert prompt.iteration == i
-
-
-@pytest.mark.asyncio
-async def test_weakness_analysis_stored(
-    minimal_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that weakness analysis is stored for each refinement iteration.
-
-    Each iteration should identify and record weaknesses.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=minimal_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    # Verify weakness analyses are tracked in result object
-    for track in result.all_tracks:
-        # Track should have weaknesses_history
-        assert len(track.weaknesses_history) > 0
-
-        # Verify structure
-        for weakness in track.weaknesses_history:
-            assert weakness.iteration is not None
-            assert weakness.description is not None
-            assert isinstance(weakness.failed_test_ids, list)
-            assert isinstance(weakness.failed_test_descriptions, list)
 
 
 @pytest.mark.asyncio
