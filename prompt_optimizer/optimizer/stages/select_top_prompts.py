@@ -60,7 +60,8 @@ class SelectTopPromptsStage(BaseStage):
                 self._print_progress("\nSaving original prompt quick test report...")
 
                 # Query data needed for report
-                initial_db_prompts = context.prompt_repo.get_by_stage(context.run_id, "initial")
+                # Note: After quick_filter evaluation, prompts have stage="quick_filter", not "initial"
+                initial_db_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
                 quick_db_tests = context.test_repo.get_by_stage(context.run_id, "quick")
 
                 # Convert to Pydantic
