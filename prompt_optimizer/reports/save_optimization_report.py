@@ -119,6 +119,12 @@ async def save_optimization_report(
                 lines.append(f"   Expected: {test_case.expected_behavior[:60]}...\n")
                 lines.append(f"   Score: {test_result.evaluation.overall:.2f}/10\n")
                 lines.append(f"   Issue: {test_result.evaluation.reasoning[:100]}...\n\n")
+            else:
+                # Test case not found - display what we have
+                lines.append(f"{i}. Test ID: {test_result.test_case_id}\n")
+                lines.append(f"   Score: {test_result.evaluation.overall:.2f}/10\n")
+                lines.append(f"   Issue: {test_result.evaluation.reasoning[:100]}...\n")
+                lines.append(f"   (Test case details not found in rigorous tests)\n\n")
     else:
         lines.append("\nNo significant weaknesses found - all tests scored 7.0 or above! ✓\n")
 
@@ -164,6 +170,12 @@ async def save_optimization_report(
                     lines.append(f"   Expected: {test_case.expected_behavior[:60]}...\n")
                     lines.append(f"   Score: {test_result.evaluation.overall:.2f}/10\n")
                     lines.append(f"   Issue: {test_result.evaluation.reasoning[:100]}...\n\n")
+                else:
+                    # Test case not found - display what we have
+                    lines.append(f"{i}. Test ID: {test_result.test_case_id}\n")
+                    lines.append(f"   Score: {test_result.evaluation.overall:.2f}/10\n")
+                    lines.append(f"   Issue: {test_result.evaluation.reasoning[:100]}...\n")
+                    lines.append(f"   (Test case details not found in rigorous tests)\n\n")
         else:
             lines.append("\nNo significant weaknesses found - all tests scored 7.0 or above! ✓\n")
 
