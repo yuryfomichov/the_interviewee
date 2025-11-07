@@ -23,5 +23,5 @@ def display_results(result: OptimizationResult) -> None:
             f"  Track {track.track_id}: "
             f"{track.initial_prompt.average_score:.2f} → "
             f"{track.final_prompt.average_score:.2f} "
-            f"(+{track.improvement:.2f})"
+            f"({track.improvement:+.2f})"
         )
