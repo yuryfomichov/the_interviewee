@@ -14,24 +14,38 @@ from prompt_optimizer.tests.helpers.fake_agents import fake_runner_run
 
 
 @pytest.fixture
-def temp_db_path(tmp_path):
-    """Provide a temporary database path for testing."""
-    db_dir = tmp_path / "test_storage"
-    db_dir.mkdir(exist_ok=True)
-    return db_dir / "test_optimizer.db"
+def temp_db_path(request):
+    """
+    Provide a database path in the tests directory for easier inspection.
+
+    Creates databases in .test_dbs/ folder inside tests directory.
+    Each test gets a unique database file based on test name and timestamp.
+    """
+    import time
+
+    # Create .test_dbs directory in tests folder
+    test_db_dir = Path(__file__).parent / ".test_dbs"
+    test_db_dir.mkdir(exist_ok=True)
+
+    # Create unique database file for this test
+    test_name = request.node.name
+    timestamp = int(time.time() * 1000)
+    db_path = test_db_dir / f"test_{test_name}_{timestamp}.db"
+
+    return db_path
 
 
 @pytest.fixture
 def test_database(temp_db_path):
     """
-    Provide a real Database instance with temporary storage.
+    Provide a real Database instance with persistent test storage.
 
     Uses real SQLite database (not in-memory) so we can inspect state between stages.
-    Database is automatically cleaned up after test completes.
+    Database files are stored in tests/.test_dbs/ for easy inspection and debugging.
     """
     db = Database(temp_db_path)
     yield db
-    # Cleanup happens automatically when tmp_path is removed
+    # Note: Database files are kept for inspection. Clean up .test_dbs/ directory manually if needed.
 
 
 @pytest.fixture
