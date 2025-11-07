@@ -18,7 +18,7 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
     Returns:
         Path to saved Q&A file
     """
-    qa_file = Path(output_dir) / "champion_qa_results.txt"
+    qa_file = Path(output_dir) / "champion_qa_results.md"
     qa_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Create a mapping of test_case_id to test case for easy lookup

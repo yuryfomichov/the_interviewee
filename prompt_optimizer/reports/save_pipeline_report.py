@@ -18,7 +18,7 @@ async def save_pipeline_report(result: OptimizationResult, output_dir: str) -> P
     Returns:
         Path to saved report file
     """
-    report_file = Path(output_dir) / "pipeline_report.txt"
+    report_file = Path(output_dir) / "pipeline_report.md"
     report_file.parent.mkdir(parents=True, exist_ok=True)
 
     lines = []

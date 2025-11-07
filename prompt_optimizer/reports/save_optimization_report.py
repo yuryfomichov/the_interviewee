@@ -23,7 +23,7 @@ async def save_optimization_report(
     Returns:
         Path to saved report file
     """
-    report_file = Path(output_dir) / "optimization_report.txt"
+    report_file = Path(output_dir) / "optimization_report.md"
     report_file.parent.mkdir(parents=True, exist_ok=True)
 
     lines = []

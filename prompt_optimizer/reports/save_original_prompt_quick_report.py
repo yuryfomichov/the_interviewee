@@ -32,7 +32,7 @@ async def save_original_prompt_quick_report(
     if not original_prompt:
         return None
 
-    report_file = Path(output_dir) / "original_prompt_quick_report.txt"
+    report_file = Path(output_dir) / "original_prompt_quick_report.md"
     report_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Get test results for original prompt from database

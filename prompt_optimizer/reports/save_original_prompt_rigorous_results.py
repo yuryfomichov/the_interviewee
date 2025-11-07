@@ -23,7 +23,7 @@ async def save_original_prompt_rigorous_results(
     if not result.original_system_prompt or not result.original_system_prompt_test_results:
         return None
 
-    qa_file = Path(output_dir) / "original_prompt_rigorous_results.txt"
+    qa_file = Path(output_dir) / "original_prompt_rigorous_results.md"
     qa_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Create a mapping of test_case_id to test case for easy lookup
