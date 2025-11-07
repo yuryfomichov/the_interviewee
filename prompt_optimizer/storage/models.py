@@ -1,11 +1,17 @@
 """SQLAlchemy ORM models for prompt optimizer storage."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import ForeignKey, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base class for all ORM models."""
+
+    pass
 
 
 class OptimizationRun(Base):
@@ -13,19 +19,19 @@ class OptimizationRun(Base):
 
     __tablename__ = "optimization_runs"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    task_description = Column(Text, nullable=False)
-    started_at = Column(DateTime, nullable=False, default=datetime.now)
-    completed_at = Column(DateTime, nullable=True)
-    champion_prompt_id = Column(String, ForeignKey("prompts.id"), nullable=True)
-    total_tests_run = Column(Integer, nullable=True)
-    status = Column(String, default="running")  # running, completed, failed
-    total_time_seconds = Column(Float, nullable=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    task_description: Mapped[str] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    completed_at: Mapped[datetime | None] = mapped_column(default=None)
+    champion_prompt_id: Mapped[str | None] = mapped_column(ForeignKey("prompts.id"), default=None)
+    total_tests_run: Mapped[int | None] = mapped_column(default=None)
+    status: Mapped[str] = mapped_column(default="running")  # running, completed, failed
+    total_time_seconds: Mapped[float | None] = mapped_column(default=None)
 
     # Relationships
-    prompts = relationship("Prompt", back_populates="run", foreign_keys="Prompt.run_id")
-    test_cases = relationship("TestCase", back_populates="run")
-    evaluations = relationship("Evaluation", back_populates="run")
+    prompts: Mapped[list[Prompt]] = relationship(back_populates="run", foreign_keys="Prompt.run_id")
+    test_cases: Mapped[list[TestCase]] = relationship(back_populates="run")
+    evaluations: Mapped[list[Evaluation]] = relationship(back_populates="run")
 
 
 class Prompt(Base):
@@ -33,25 +39,25 @@ class Prompt(Base):
 
     __tablename__ = "prompts"
 
-    id = Column(String, primary_key=True)
-    run_id = Column(Integer, ForeignKey("optimization_runs.id"), nullable=False)
-    prompt_text = Column(Text, nullable=False)
-    stage = Column(String, nullable=False)  # initial, quick_filter, rigorous, refined
-    strategy = Column(String, nullable=True)
-    average_score = Column(Float, nullable=True)
-    quick_score = Column(Float, nullable=True)
-    rigorous_score = Column(Float, nullable=True)
-    iteration = Column(Integer, default=0)
-    track_id = Column(Integer, nullable=True)
-    parent_prompt_id = Column(String, ForeignKey("prompts.id"), nullable=True)  # Refinement lineage
-    is_original_system_prompt = Column(Boolean, default=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("optimization_runs.id"))
+    prompt_text: Mapped[str] = mapped_column(Text)
+    stage: Mapped[str]  # initial, quick_filter, rigorous, refined
+    strategy: Mapped[str | None] = mapped_column(default=None)
+    average_score: Mapped[float | None] = mapped_column(default=None)
+    quick_score: Mapped[float | None] = mapped_column(default=None)
+    rigorous_score: Mapped[float | None] = mapped_column(default=None)
+    iteration: Mapped[int] = mapped_column(default=0)
+    track_id: Mapped[int | None] = mapped_column(default=None)
+    parent_prompt_id: Mapped[str | None] = mapped_column(ForeignKey("prompts.id"), default=None)  # Refinement lineage
+    is_original_system_prompt: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     # Relationships
-    run = relationship("OptimizationRun", back_populates="prompts", foreign_keys=[run_id])
-    parent = relationship("Prompt", remote_side=[id], backref="children")
-    evaluations = relationship("Evaluation", back_populates="prompt")
-    weaknesses = relationship("WeaknessAnalysis", back_populates="prompt", order_by="WeaknessAnalysis.iteration")
+    run: Mapped[OptimizationRun] = relationship(back_populates="prompts", foreign_keys=[run_id])
+    parent: Mapped[Prompt | None] = relationship(remote_side=[id], backref="children")
+    evaluations: Mapped[list[Evaluation]] = relationship(back_populates="prompt")
+    weaknesses: Mapped[list[WeaknessAnalysis]] = relationship(back_populates="prompt", order_by="WeaknessAnalysis.iteration")
 
 
 class TestCase(Base):
@@ -59,17 +65,17 @@ class TestCase(Base):
 
     __tablename__ = "test_cases"
 
-    id = Column(String, primary_key=True)
-    run_id = Column(Integer, ForeignKey("optimization_runs.id"), nullable=False)
-    input_message = Column(Text, nullable=False)
-    expected_behavior = Column(Text, nullable=False)
-    category = Column(String, nullable=False)  # core, edge, boundary, adversarial, consistency, format
-    stage = Column(String, nullable=False)  # quick or rigorous
-    created_at = Column(DateTime, default=datetime.now)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("optimization_runs.id"))
+    input_message: Mapped[str] = mapped_column(Text)
+    expected_behavior: Mapped[str] = mapped_column(Text)
+    category: Mapped[str]  # core, edge, boundary, adversarial, consistency, format
+    stage: Mapped[str]  # quick or rigorous
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     # Relationships
-    run = relationship("OptimizationRun", back_populates="test_cases")
-    evaluations = relationship("Evaluation", back_populates="test_case")
+    run: Mapped[OptimizationRun] = relationship(back_populates="test_cases")
+    evaluations: Mapped[list[Evaluation]] = relationship(back_populates="test_case")
 
 
 class Evaluation(Base):
@@ -77,23 +83,23 @@ class Evaluation(Base):
 
     __tablename__ = "evaluations"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(Integer, ForeignKey("optimization_runs.id"), nullable=False)
-    test_case_id = Column(String, ForeignKey("test_cases.id"), nullable=False)
-    prompt_id = Column(String, ForeignKey("prompts.id"), nullable=False)
-    model_response = Column(Text, nullable=False)
-    functionality = Column(Integer, nullable=False)
-    safety = Column(Integer, nullable=False)
-    consistency = Column(Integer, nullable=False)
-    edge_case_handling = Column(Integer, nullable=False)
-    reasoning = Column(Text, nullable=False)
-    overall_score = Column(Float, nullable=False)
-    timestamp = Column(DateTime, nullable=False, default=datetime.now)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    run_id: Mapped[int] = mapped_column(ForeignKey("optimization_runs.id"))
+    test_case_id: Mapped[str] = mapped_column(ForeignKey("test_cases.id"))
+    prompt_id: Mapped[str] = mapped_column(ForeignKey("prompts.id"))
+    model_response: Mapped[str] = mapped_column(Text)
+    functionality: Mapped[int]
+    safety: Mapped[int]
+    consistency: Mapped[int]
+    edge_case_handling: Mapped[int]
+    reasoning: Mapped[str] = mapped_column(Text)
+    overall_score: Mapped[float]
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.now)
 
     # Relationships
-    run = relationship("OptimizationRun", back_populates="evaluations")
-    test_case = relationship("TestCase", back_populates="evaluations")
-    prompt = relationship("Prompt", back_populates="evaluations")
+    run: Mapped[OptimizationRun] = relationship(back_populates="evaluations")
+    test_case: Mapped[TestCase] = relationship(back_populates="evaluations")
+    prompt: Mapped[Prompt] = relationship(back_populates="evaluations")
 
 
 class WeaknessAnalysis(Base):
@@ -101,13 +107,13 @@ class WeaknessAnalysis(Base):
 
     __tablename__ = "weakness_analyses"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    prompt_id = Column(String, ForeignKey("prompts.id"), nullable=False)
-    iteration = Column(Integer, nullable=False)
-    description = Column(Text, nullable=False)
-    failed_test_ids = Column(Text, nullable=False)  # JSON array as string
-    failed_test_descriptions = Column(Text, nullable=False)  # JSON array as string
-    created_at = Column(DateTime, default=datetime.now)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    prompt_id: Mapped[str] = mapped_column(ForeignKey("prompts.id"))
+    iteration: Mapped[int]
+    description: Mapped[str] = mapped_column(Text)
+    failed_test_ids: Mapped[str] = mapped_column(Text)  # JSON array as string
+    failed_test_descriptions: Mapped[str] = mapped_column(Text)  # JSON array as string
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     # Relationships
-    prompt = relationship("Prompt", back_populates="weaknesses")
+    prompt: Mapped[Prompt] = relationship(back_populates="weaknesses")
