@@ -209,12 +209,11 @@ class EvaluatePromptsStage(BaseStage):
             else:
                 # Normal flow: update stage for all prompts (including original if it was selected)
                 prompt.stage = self.stage_name
-                # Store scores in dedicated fields for original prompt
-                if prompt.is_original_system_prompt:
-                    if self.stage_name == "quick_filter":
-                        prompt.quick_score = avg_score
-                    else:  # rigorous
-                        prompt.rigorous_score = avg_score
+                # Store scores in dedicated fields for ALL prompts (not just original)
+                if self.stage_name == "quick_filter":
+                    prompt.quick_score = avg_score
+                else:  # rigorous
+                    prompt.rigorous_score = avg_score
 
             # Save to database
             db_prompt = PromptConverter.to_db(prompt, context.run_id)

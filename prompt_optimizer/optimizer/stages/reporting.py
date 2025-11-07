@@ -138,7 +138,13 @@ class ReportingStage(BaseStage):
             Dictionary with converted prompts and tests
         """
         # Query from database
-        db_initial_prompts = context.prompt_repo.get_by_stage(context.run_id, "initial")
+        # Get all initially generated prompts (iteration=0, went through quick evaluation)
+        # Note: Can't use stage="initial" because prompts advance to "quick_filter" after evaluation
+        all_prompts = context.prompt_repo.get_all_for_run(context.run_id)
+        db_initial_prompts = [
+            p for p in all_prompts
+            if p.iteration == 0 and p.quick_score is not None
+        ]
         db_top_k_prompts = context.prompt_repo.get_by_stage(context.run_id, "quick_filter")
         db_top_m_prompts = context.prompt_repo.get_by_stage(context.run_id, "rigorous")
         db_quick_tests = context.test_repo.get_by_stage(context.run_id, "quick")
