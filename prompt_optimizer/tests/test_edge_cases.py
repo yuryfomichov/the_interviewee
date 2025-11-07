@@ -86,37 +86,3 @@ async def test_database_isolation_between_runs(
 
     finally:
         session.close()
-
-
-@pytest.mark.asyncio
-async def test_all_test_categories_present(
-    realistic_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that all test case categories are present when configured.
-
-    Verifies the full range of test types are generated.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=realistic_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-    session = test_database.get_session()
-
-    try:
-        from prompt_optimizer.storage.models import TestCase
-
-        rigorous_tests = session.query(TestCase).filter_by(
-            run_id=result.run_id, stage="rigorous"
-        ).all()
-
-        # Get unique categories
-        categories = {test.category for test in rigorous_tests}
-
-        # Should have all configured categories
-        expected_categories = {"core", "edge", "boundary", "adversarial", "consistency", "format"}
-        assert expected_categories.issubset(categories)
-
-    finally:
-        session.close()

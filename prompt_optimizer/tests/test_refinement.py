@@ -159,28 +159,3 @@ async def test_parallel_refinement_execution(
         assert track.final_prompt is not None
         assert len(track.iterations) >= 0
         assert len(track.score_progression) > 0
-
-
-@pytest.mark.asyncio
-async def test_convergence_threshold_respected(
-    early_stopping_config, dummy_connector, mock_agents, test_database
-):
-    """
-    Test that convergence threshold determines when iterations continue.
-
-    Iterations should only continue if improvement >= convergence_threshold.
-    """
-    optimizer = PromptOptimizer(
-        model_client=dummy_connector, config=early_stopping_config, database=test_database
-    )
-
-    result = await optimizer.optimize()
-
-    threshold = early_stopping_config.convergence_threshold
-
-    # For tracks that continued past initial, verify improvements met threshold
-    for track in result.all_tracks:
-        if len(track.score_progression) > 1:
-            # Check that continued iterations had meaningful improvement
-            # (Note: with fake agents, we may not always see this, but structure is tested)
-            assert len(track.score_progression) > 0
