@@ -29,7 +29,7 @@ async def save_champion_qa_results(result: OptimizationResult, output_dir: str) 
     lines.append("CHAMPION PROMPT Q&A RESULTS\n")
     lines.append("=" * 70 + "\n")
     lines.append(f"Champion Prompt ID: {result.best_prompt.id}\n")
-    lines.append(f"Overall Score: {result.best_prompt.average_score:.2f}\n")
+    lines.append(f"Overall Score: {result.best_prompt.rigorous_score:.2f}\n")
     lines.append(f"Total Tests: {len(result.champion_test_results)}\n")
     lines.append("=" * 70 + "\n\n")
 

@@ -30,7 +30,7 @@ async def save_optimization_report(
     lines.append("PROMPT OPTIMIZATION REPORT\n")
     lines.append("=" * 70 + "\n\n")
     lines.append(f"Task: {task_spec.task_description}\n\n")
-    lines.append(f"Champion Score: {result.best_prompt.average_score:.2f}\n")
+    lines.append(f"Champion Score: {result.best_prompt.rigorous_score:.2f}\n")
     lines.append(f"Total Tests: {result.total_tests_run}\n")
     lines.append(f"Total Time: {result.total_time_seconds:.1f}s\n\n")
 
@@ -47,10 +47,10 @@ async def save_optimization_report(
         )
         if (
             result.original_system_prompt_rigorous_score is not None
-            and result.best_prompt.average_score is not None
+            and result.best_prompt.rigorous_score is not None
         ):
             improvement = (
-                result.best_prompt.average_score - result.original_system_prompt_rigorous_score
+                result.best_prompt.rigorous_score - result.original_system_prompt_rigorous_score
             )
             improvement_pct = improvement / result.original_system_prompt_rigorous_score * 100
         else:
@@ -66,14 +66,14 @@ async def save_optimization_report(
     lines.append("=" * 70 + "\n")
     for track in result.all_tracks:
         # Calculate best score achieved (not just the final iteration)
-        best_score = max(track.score_progression) if track.score_progression else track.final_prompt.average_score
-        best_improvement = best_score - track.initial_prompt.average_score
+        best_score = max(track.score_progression) if track.score_progression else track.final_prompt.rigorous_score
+        best_improvement = best_score - track.initial_prompt.rigorous_score
         best_iter = track.score_progression.index(best_score) if track.score_progression else 0
 
         lines.append(f"\nTrack {track.track_id}:\n")
-        lines.append(f"  Initial: {track.initial_prompt.average_score:.2f}\n")
+        lines.append(f"  Initial: {track.initial_prompt.rigorous_score:.2f}\n")
         lines.append(f"  Best: {best_score:.2f} (iteration {best_iter})\n")
-        lines.append(f"  Final: {track.final_prompt.average_score:.2f}\n")
+        lines.append(f"  Final: {track.final_prompt.rigorous_score:.2f}\n")
         lines.append(f"  Best improvement: {best_improvement:+.2f}\n")
         lines.append(f"  Iterations: {len(track.iterations)}\n")
         lines.append(

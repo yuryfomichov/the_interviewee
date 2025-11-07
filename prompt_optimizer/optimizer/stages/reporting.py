@@ -66,7 +66,7 @@ class ReportingStage(BaseStage):
         champion = self._find_champion(context)
 
         self._print_progress("\n=== OPTIMIZATION COMPLETE ===")
-        self._print_progress(f"Champion Score: {champion.average_score:.2f}")
+        self._print_progress(f"Champion Score: {champion.rigorous_score:.2f}")
         self._print_progress(f"Champion Track: {champion.track_id}")
 
         # Calculate metrics and complete run
@@ -135,7 +135,8 @@ class ReportingStage(BaseStage):
         if not track_prompts:
             raise ValueError("No refinement track prompts found!")
 
-        champion_db = max(track_prompts, key=lambda p: p.average_score or 0)
+        # Champion is selected from refinement tracks (evaluated on rigorous tests)
+        champion_db = max(track_prompts, key=lambda p: p.rigorous_score or 0)
         return PromptConverter.from_db(champion_db)
 
     def _query_all_prompts_and_tests(self, context: RunContext) -> dict:
@@ -201,8 +202,9 @@ class ReportingStage(BaseStage):
             # final_prompt should be the LAST iteration, not the best scoring one
             # (track comparison shows progression: initial → final)
             final_prompt = pydantic_prompts[-1]
-            score_progression = [p.average_score or 0 for p in pydantic_prompts]
-            improvement = (final_prompt.average_score or 0) - (initial_prompt.average_score or 0)
+            # Refinement tracks use rigorous_score (all iterations evaluated on rigorous tests)
+            score_progression = [p.rigorous_score or 0 for p in pydantic_prompts]
+            improvement = (final_prompt.rigorous_score or 0) - (initial_prompt.rigorous_score or 0)
 
             # Get weaknesses for this track
             db_weaknesses = []

@@ -13,15 +13,16 @@ def display_results(result: OptimizationResult) -> None:
     print("\n" + "=" * 70)
     print("OPTIMIZATION COMPLETE!")
     print("=" * 70)
-    print(f"\nChampion Prompt Score: {result.best_prompt.average_score:.2f}")
+    print(f"\nChampion Prompt Score: {result.best_prompt.rigorous_score:.2f}")
     print(f"Champion Track: {result.best_prompt.track_id}")
     print(f"\nTotal Tests Run: {result.total_tests_run}")
     print(f"Total Time: {result.total_time_seconds:.1f} seconds")
     print("\nTrack Comparison:")
     for track in result.all_tracks:
         # Find the best score achieved in this track (not the final iteration)
-        best_score = max(track.score_progression) if track.score_progression else track.final_prompt.average_score
-        initial_score = track.initial_prompt.average_score
+        # All track iterations use rigorous_score (evaluated on rigorous tests)
+        best_score = max(track.score_progression) if track.score_progression else track.final_prompt.rigorous_score
+        initial_score = track.initial_prompt.rigorous_score
         improvement = best_score - initial_score
 
         print(
