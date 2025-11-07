@@ -85,8 +85,15 @@ class ReportingStage(BaseStage):
             self._get_original_prompt_data(context)
         )
 
-        # Get champion evaluations
-        champion_test_results = self._get_evaluation_results(context, champion.id)
+        # Get champion evaluations (filter to rigorous tests only)
+        all_champion_results = self._get_evaluation_results(context, champion.id)
+
+        # Champion might be from iteration 0 (could be original prompt), so filter to rigorous tests
+        rigorous_test_ids = {test.id for test in prompts_data["rigorous_tests"]}
+        champion_test_results = [
+            result for result in all_champion_results
+            if result.test_case_id in rigorous_test_ids
+        ]
 
         # Create the optimization result
         result = OptimizationResult(
@@ -245,7 +252,19 @@ class ReportingStage(BaseStage):
 
         original_prompt = PromptConverter.from_db(original_db_prompt)
         original_rigorous_score = original_prompt.rigorous_score
-        original_test_results = self._get_evaluation_results(context, original_db_prompt.id)
+
+        # Get ALL evaluations, then filter to only rigorous test evaluations
+        all_test_results = self._get_evaluation_results(context, original_db_prompt.id)
+
+        # Get rigorous test IDs to filter evaluations
+        db_rigorous_tests = context.test_repo.get_by_stage(context.run_id, "rigorous")
+        rigorous_test_ids = {test.id for test in db_rigorous_tests}
+
+        # Filter to only include evaluations on rigorous tests
+        original_test_results = [
+            result for result in all_test_results
+            if result.test_case_id in rigorous_test_ids
+        ]
 
         return original_prompt, original_rigorous_score, original_test_results
 
